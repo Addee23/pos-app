@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum Role {
+  PERSONAL
+  ADMIN
+}
+
+enum ProductType {
+  SIMPLE
+  VARIABLE
+}
+
+model Store {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logoUrl   String?
+  wooUrl    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  products  Product[]
+  auditLogs AuditLog[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(PERSONAL)
+  storeId      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  store     Store?     @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  auditLogs AuditLog[]
+}
+
+model Product {
+  id            String      @id @default(cuid())
+  storeId       String
+  wooProductId  Int
+  name          String
+  slug          String
+  permalink     String?
+  productType   ProductType @default(SIMPLE)
+  price         Decimal     @db.Decimal(10, 2)
+  ean           String?
+  stockQuantity Int         @default(0)
+  stockLocation String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  store    Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  variants ProductVariant[]
+
+  @@unique([storeId, wooProductId])
+  @@index([storeId, name])
+  @@index([storeId, ean])
+  @@index([slug])
+}
+
+model ProductVariant {
+  id            String   @id @default(cuid())
+  productId     String
+  wooVariantId  Int
+  name          String
+  price         Decimal  @db.Decimal(10, 2)
+  ean           String?
+  stockQuantity Int      @default(0)
+  stockLocation String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, wooVariantId])
+  @@index([ean])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  storeId    String?
+  entityType String
+  entityId   String
+  field      String
+  oldValue   String?
+  newValue   String?
+  createdAt  DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store Store? @relation(fields: [storeId], references: [id], onDelete: SetNull)
+
+  @@index([storeId, createdAt])
+  @@index([entityType, entityId])
+}

@@ -1,36 +1,106 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# POS & Lagerhanteringssystem
 
-## Getting Started
+Internt POS- och lagerhanteringssystem (mobile-first) enligt LIA-projektbeskrivningen.
 
-First, run the development server:
+## Vecka 1 – vad som är klart
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Inloggning med **Auth.js (NextAuth)**
+- Roller: **ADMIN** och **PERSONAL** (RBAC i middleware + API)
+- Krypterade lösenord med **bcrypt**
+- **Produkthantering** för admin (sök, filtrera per butik, redigera pris/EAN/lager/lagerplats)
+- **Audit logs** vid produktändringar
+- **Zod**-validering på API
+
+## Teknik
+
+- Next.js 16 + TypeScript
+- Prisma ORM + MySQL
+- Tailwind CSS
+- Auth.js v5
+
+## Kom igång (steg för steg)
+
+### 1. Installera MySQL
+
+**Alternativ A – Docker (rekommenderat om du har Docker Desktop):**
+
+```powershell
+cd c:\Users\adiii\OneDrive\Documents\LIA2\pos-app
+docker compose up -d
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**Alternativ B – XAMPP (om du inte har Docker):**
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Ladda ner [XAMPP](https://www.apachefriends.org/) och starta **MySQL**
+2. Öppna phpMyAdmin (`http://localhost/phpmyadmin`)
+3. Skapa databasen `pos_app`
+4. Skapa användare `pos` med lösenord `pos_password` och ge åtkomst till `pos_app`
+5. Uppdatera `.env` om du använder andra uppgifter
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Vänta tills MySQL körs innan du går vidare.
 
-## Learn More
+### 3. Miljövariabler
 
-To learn more about Next.js, take a look at the following resources:
+Kopiera `.env.example` till `.env` (redan skapad vid utveckling):
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+DATABASE_URL="mysql://pos:pos_password@localhost:3306/pos_app"
+AUTH_SECRET="din-hemliga-nyckel-minst-32-tecken"
+NEXTAUTH_URL="http://localhost:3000"
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 4. Databasmigrering och testdata
 
-## Deploy on Vercel
+```powershell
+npm run db:migrate
+npm run db:seed
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 5. Starta appen
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```powershell
+npm run dev
+```
+
+Öppna [http://localhost:3000](http://localhost:3000)
+
+### Testkonton
+
+| Roll     | E-post              | Lösenord     |
+|----------|---------------------|--------------|
+| Admin    | admin@butik.se      | admin123     |
+| Personal | personal@butik.se   | personal123  |
+
+## Projektstruktur
+
+```
+src/
+  app/
+    login/          # Inloggning
+    (app)/          # Skyddade sidor med navigation
+      kassa/
+      admin/products/
+  auth.ts           # Auth.js-konfiguration
+  middleware.ts     # RBAC & omdirigering
+  lib/              # Prisma, validering, audit
+  components/       # UI-komponenter
+prisma/
+  schema.prisma     # Datamodell
+  seed.ts           # Testdata
+```
+
+## Nästa steg (vecka 2+)
+
+- Kassaflöde (skanning, kvitto)
+- WooCommerce webhook-sync
+- Upphämtningar
+- PWA + kamera
+- Dashboard med sync-status
+
+## Git
+
+```powershell
+git checkout -b dev
+git add .
+git commit -m "feat: login, roller och produkthantering"
+```
