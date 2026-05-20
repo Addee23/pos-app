@@ -30,7 +30,6 @@ async function main() {
     create: {
       name: "Demo Butik",
       slug: "demo-butik",
-      wooUrl: "https://example.com",
     },
   });
 

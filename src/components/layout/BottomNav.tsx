@@ -21,6 +21,7 @@ const adminNav: NavItem[] = [
   { href: "/admin/products", label: "Produkter" },
   { href: "/sok", label: "Sök" },
   { href: "/upphamtning", label: "Upphämtning" },
+  { href: "/admin/settings", label: "Settings" },
 ];
 
 type BottomNavProps = {
@@ -33,15 +34,15 @@ export function BottomNav({ role }: BottomNavProps) {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200 bg-white/95 backdrop-blur safe-area-pb">
-      <ul className="mx-auto flex max-w-lg items-stretch justify-around">
+      <ul className="mx-auto flex max-w-xl items-stretch overflow-x-auto">
         {items.map((item) => {
           const active =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
-            <li key={item.href} className="flex-1">
+            <li key={item.href} className="min-w-20 flex-1">
               <Link
                 href={item.href}
-                className={`flex min-h-14 flex-col items-center justify-center px-1 text-xs font-medium transition ${
+                className={`flex min-h-14 cursor-pointer flex-col items-center justify-center px-1 text-xs font-medium transition ${
                   active ? "text-zinc-900" : "text-zinc-500 hover:text-zinc-700"
                 }`}
               >

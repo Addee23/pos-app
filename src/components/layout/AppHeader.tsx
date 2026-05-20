@@ -9,7 +9,7 @@ type AppHeaderProps = {
 export function AppHeader({ title, subtitle, userName }: AppHeaderProps) {
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex max-w-lg items-center justify-between gap-3 px-4 py-4">
+      <div className="mx-auto flex max-w-xl items-center justify-between gap-3 px-3 py-4 sm:px-4">
         <div className="min-w-0">
           <h1 className="truncate text-lg font-semibold text-zinc-900">{title}</h1>
           {subtitle ? (
@@ -27,7 +27,7 @@ export function AppHeader({ title, subtitle, userName }: AppHeaderProps) {
         >
           <button
             type="submit"
-            className="shrink-0 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+            className="shrink-0 cursor-pointer rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
           >
             Logga ut
           </button>

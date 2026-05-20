@@ -9,7 +9,9 @@ type ProductsPageProps = {
   searchParams: Promise<{ q?: string; storeId?: string }>;
 };
 
-export default async function AdminProductsPage({ searchParams }: ProductsPageProps) {
+export default async function AdminProductsPage({
+  searchParams,
+}: ProductsPageProps) {
   const session = await auth();
   if (session?.user.role !== "ADMIN") {
     redirect("/kassa");
@@ -45,8 +47,8 @@ export default async function AdminProductsPage({ searchParams }: ProductsPagePr
   ]);
 
   return (
-    <section className="flex flex-col gap-6">
-      <ProductsHeader />
+    <section className="flex flex-col gap-4">
+      <ProductsHeader productCount={products.length} storeCount={stores.length} />
       <Suspense>
         <ProductSearch
           stores={stores}
@@ -59,14 +61,36 @@ export default async function AdminProductsPage({ searchParams }: ProductsPagePr
   );
 }
 
-function ProductsHeader() {
+function ProductsHeader({
+  productCount,
+  storeCount,
+}: {
+  productCount: number;
+  storeCount: number;
+}) {
   return (
-    <div>
-      <h2 className="text-lg font-semibold text-zinc-900">Produkter</h2>
-      <p className="mt-1 text-sm text-zinc-500">
-        Sök, filtrera per butik och uppdatera pris, EAN, lager och lagerplats.
-        Produktnamn kan inte ändras.
+    <div className="rounded-lg border border-zinc-200 bg-white p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
+        Admin
       </p>
+      <h2 className="mt-1 text-xl font-semibold text-zinc-900">Produkter</h2>
+      <p className="mt-2 text-sm leading-6 text-zinc-500">
+        Sök, filtrera och uppdatera pris, EAN, lager och lagerplats.
+        Produktnamn kommer fran WooCommerce och ar skrivskyddat.
+      </p>
+      <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+        <SummaryBox label="Visade produkter" value={String(productCount)} />
+        <SummaryBox label="Butiker" value={String(storeCount)} />
+      </div>
+    </div>
+  );
+}
+
+function SummaryBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-zinc-50 px-3 py-2">
+      <p className="text-xs font-medium text-zinc-400">{label}</p>
+      <p className="mt-0.5 text-lg font-semibold text-zinc-900">{value}</p>
     </div>
   );
 }

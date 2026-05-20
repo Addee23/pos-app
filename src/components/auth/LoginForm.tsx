@@ -35,7 +35,7 @@ export function LoginForm({ callbackUrl = "/" }: LoginFormProps) {
       <button
         type="submit"
         disabled={pending}
-        className="mt-2 w-full rounded-xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-2 w-full cursor-pointer rounded-xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {pending ? "Loggar in..." : "Logga in"}
       </button>
@@ -51,7 +51,7 @@ function FormField(props: React.ComponentProps<"input"> & { label: string }) {
       <input
         id={id}
         {...inputProps}
-        className="rounded-xl border border-zinc-200 bg-white px-3 py-3 text-base text-zinc-900 outline-none ring-zinc-900/10 transition focus:border-zinc-400 focus:ring-2"
+        className="min-h-12 cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base text-zinc-900 outline-none ring-zinc-900/10 transition focus:border-zinc-400 focus:ring-2"
       />
     </label>
   );
