@@ -16,8 +16,12 @@ export default async function AppLayout({
 
   return (
     <div className="flex min-h-full flex-col bg-zinc-50">
-      <AppHeader title="POS & Lager" userName={session.user.name} />
-      <main className="mx-auto w-full max-w-xl flex-1 px-3 pb-28 pt-3 sm:px-4 sm:pt-4">
+      <AppHeader
+        title="POS & Lager"
+        userName={session.user.name}
+        role={session.user.role}
+      />
+      <main className="mx-auto w-full max-w-6xl flex-1 px-3 pb-36 pt-3 sm:px-4 sm:pt-4 md:px-6 md:pb-8">
         {children}
       </main>
       <BottomNav role={session.user.role} />
