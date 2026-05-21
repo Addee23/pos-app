@@ -22,19 +22,30 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const { id } = await context.params;
 
-  const product = await prisma.product.findUnique({
-    where: { id },
-    include: {
-      store: { select: { id: true, name: true } },
-      variants: { orderBy: { name: "asc" } },
-    },
-  });
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        store: { select: { id: true, name: true } },
+        variants: { orderBy: { name: "asc" } },
+      },
+    });
 
-  if (!product) {
-    return NextResponse.json({ error: "Produkten hittades inte" }, { status: 404 });
+    if (!product) {
+      return NextResponse.json(
+        { error: "Produkten hittades inte" },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json(product);
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json(
+      { error: "Kunde inte hämta produkten" },
+      { status: 500 },
+    );
   }
-
-  return NextResponse.json(product);
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -48,8 +59,12 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  const body = await request.json();
-  const parsed = productUpdateSchema.safeParse(body);
+  const body = await readJsonBody(request);
+  if (!body.ok) {
+    return NextResponse.json({ error: "Ogiltig JSON" }, { status: 400 });
+  }
+
+  const parsed = productUpdateSchema.safeParse(body.data);
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -58,44 +73,65 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-  const existing = await prisma.product.findUnique({ where: { id } });
-  if (!existing) {
-    return NextResponse.json({ error: "Produkten hittades inte" }, { status: 404 });
-  }
-
-  const data = parsed.data;
-  const updates: Prisma.ProductUpdateInput = {
-    price: data.price,
-    ean: data.ean,
-    stockQuantity: data.stockQuantity,
-    stockLocation: data.stockLocation,
-  };
-
-  const product = await prisma.product.update({
-    where: { id },
-    data: updates,
-    include: {
-      store: { select: { id: true, name: true } },
-      variants: { orderBy: { name: "asc" } },
-    },
-  });
-
-  const fields = ["price", "ean", "stockQuantity", "stockLocation"] as const;
-  for (const field of fields) {
-    const oldVal = String(existing[field] ?? "");
-    const newVal = String(product[field] ?? "");
-    if (oldVal !== newVal) {
-      await createAuditLog({
-        userId: session.user.id,
-        storeId: product.storeId,
-        entityType: "Product",
-        entityId: product.id,
-        field,
-        oldValue: oldVal,
-        newValue: newVal,
-      });
+  try {
+    const existing = await prisma.product.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Produkten hittades inte" },
+        { status: 404 },
+      );
     }
-  }
 
-  return NextResponse.json(product);
+    const data = parsed.data;
+    const updates: Prisma.ProductUpdateInput = {
+      price: data.price,
+      ean: data.ean,
+      stockQuantity: data.stockQuantity,
+      stockLocation: data.stockLocation,
+    };
+
+    const product = await prisma.product.update({
+      where: { id },
+      data: updates,
+      include: {
+        store: { select: { id: true, name: true } },
+        variants: { orderBy: { name: "asc" } },
+      },
+    });
+
+    const fields = ["price", "ean", "stockQuantity", "stockLocation"] as const;
+    for (const field of fields) {
+      const oldVal = String(existing[field] ?? "");
+      const newVal = String(product[field] ?? "");
+      if (oldVal !== newVal) {
+        await createAuditLog({
+          userId: session.user.id,
+          storeId: product.storeId,
+          entityType: "Product",
+          entityId: product.id,
+          field,
+          oldValue: oldVal,
+          newValue: newVal,
+        });
+      }
+    }
+
+    return NextResponse.json(product);
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json(
+      { error: "Kunde inte spara produkten" },
+      { status: 500 },
+    );
+  }
+}
+
+async function readJsonBody(
+  request: Request,
+): Promise<{ ok: true; data: unknown } | { ok: false }> {
+  try {
+    return { ok: true, data: await request.json() };
+  } catch {
+    return { ok: false };
+  }
 }

@@ -53,22 +53,26 @@ export function StoreSettingsForm({ stores, store }: StoreSettingsFormProps) {
       receiptWidthMm: formData.get("receiptWidthMm"),
     };
 
-    const response = await fetch(`/api/stores/${store.id}/settings`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    try {
+      const response = await fetch(`/api/stores/${store.id}/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
 
-    setSaving(false);
+      if (!response.ok) {
+        setError(await getErrorMessage(response, "Kunde inte spara settings"));
+        return;
+      }
 
-    if (!response.ok) {
-      const data = (await response.json()) as { error?: string };
-      setError(data.error ?? "Kunde inte spara settings");
-      return;
+      setSuccess(true);
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      setError("Något gick fel vid anropet. Försök igen.");
+    } finally {
+      setSaving(false);
     }
-
-    setSuccess(true);
-    router.refresh();
   }
 
   return (
@@ -256,4 +260,16 @@ function Alert({
       ? "bg-red-50 text-red-700"
       : "bg-emerald-50 text-emerald-700";
   return <p className={`rounded-lg px-3 py-2 text-sm ${styles}`}>{message}</p>;
+}
+
+async function getErrorMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  try {
+    const data = (await response.json()) as { error?: string };
+    return data.error ?? fallback;
+  } catch {
+    return fallback;
+  }
 }

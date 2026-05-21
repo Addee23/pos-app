@@ -15,35 +15,40 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Lösenord", type: "password" },
       },
       authorize: async (credentials) => {
-        const parsed = loginSchema.safeParse(credentials);
-        if (!parsed.success) {
+        try {
+          const parsed = loginSchema.safeParse(credentials);
+          if (!parsed.success) {
+            return null;
+          }
+
+          const user = await prisma.user.findUnique({
+            where: { email: parsed.data.email.toLowerCase() },
+          });
+
+          if (!user) {
+            return null;
+          }
+
+          const passwordValid = await compare(
+            parsed.data.password,
+            user.passwordHash,
+          );
+
+          if (!passwordValid) {
+            return null;
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            storeId: user.storeId,
+          };
+        } catch (error) {
+          console.error(error);
           return null;
         }
-
-        const user = await prisma.user.findUnique({
-          where: { email: parsed.data.email.toLowerCase() },
-        });
-
-        if (!user) {
-          return null;
-        }
-
-        const passwordValid = await compare(
-          parsed.data.password,
-          user.passwordHash,
-        );
-
-        if (!passwordValid) {
-          return null;
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          storeId: user.storeId,
-        };
       },
     }),
   ],
