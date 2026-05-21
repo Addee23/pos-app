@@ -16,7 +16,7 @@ export default async function AdminDashboardPage() {
         </p>
         <h2 className="mt-1 text-xl font-semibold text-zinc-900">Dashboard</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-500">
-          Översikt for sync-status, senaste aktiviteter och fel när de
+          Översikt för sync-status, senaste aktiviteter och fel när de
           funktionerna byggs.
         </p>
       </div>

@@ -48,7 +48,7 @@ export function ProductEditForm({ product }: ProductEditFormProps) {
     <div className="flex flex-col gap-4">
       <section className="rounded-lg border border-zinc-200 bg-white p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-          Produktnamn ar skrivskyddat
+          Produktnamn är skrivskyddat
         </p>
         <p className="mt-1 text-base font-semibold text-zinc-900">
           {product.name}
@@ -67,7 +67,7 @@ export function ProductEditForm({ product }: ProductEditFormProps) {
             Lager och pris
           </h3>
           <p className="mt-1 text-xs text-zinc-500">
-            Dessa fält ar lokala for POS/lager tills Woo-sync byggs.
+            Dessa fält är lokala för POS/lager tills Woo-sync byggs.
           </p>
         </div>
 

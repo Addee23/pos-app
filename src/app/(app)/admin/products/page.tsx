@@ -76,7 +76,7 @@ function ProductsHeader({
       <h2 className="mt-1 text-xl font-semibold text-zinc-900">Produkter</h2>
       <p className="mt-2 text-sm leading-6 text-zinc-500">
         Sök, filtrera och uppdatera pris, EAN, lager och lagerplats.
-        Produktnamn kommer fran WooCommerce och ar skrivskyddat.
+        Produktnamn kommer från WooCommerce och är skrivskyddat.
       </p>
       <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
         <SummaryBox label="Visade produkter" value={String(productCount)} />
