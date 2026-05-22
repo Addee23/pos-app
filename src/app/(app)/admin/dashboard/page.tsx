@@ -38,6 +38,16 @@ export default async function AdminDashboardPage() {
           text="Se audit logs för produkt- och variantändringar."
         />
         <DashboardLink
+          href="/admin/users"
+          title="Användare"
+          text="Hantera personal, admins, roller och butikskoppling."
+        />
+        <DashboardLink
+          href="/admin/reports"
+          title="Rapporter"
+          text="Se försäljning, snittköp och mest sålda produkter."
+        />
+        <DashboardLink
           href="/admin/settings"
           title="Settings"
           text="Hantera butik och kvittoinställningar."

@@ -19,6 +19,8 @@ const adminNav: NavItem[] = [
   { href: "/sok", label: "Sök", shortLabel: "Sök" },
   { href: "/upphamtning", label: "Upphämtning", shortLabel: "Hämta" },
   { href: "/admin/logs", label: "Logs", shortLabel: "Logs" },
+  { href: "/admin/users", label: "Användare", shortLabel: "Users" },
+  { href: "/admin/reports", label: "Rapporter", shortLabel: "Rapporter" },
   { href: "/admin/settings", label: "Inställningar", shortLabel: "Inställningar" },
 ];
 

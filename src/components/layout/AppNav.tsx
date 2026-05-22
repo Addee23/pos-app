@@ -15,7 +15,12 @@ export function AppNav({ role, variant }: AppNavProps) {
   const allItems = getNavItems(role);
   const items =
     variant === "mobile" && role === "ADMIN"
-      ? allItems.filter((item) => item.href !== "/admin/logs")
+      ? allItems.filter(
+          (item) =>
+            !["/admin/logs", "/admin/users", "/admin/reports"].includes(
+              item.href,
+            ),
+        )
       : allItems;
   const mobileColumns =
     role === "ADMIN"

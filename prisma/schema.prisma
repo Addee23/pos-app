@@ -25,6 +25,12 @@ enum StockMovementType {
   SYNC
 }
 
+enum PickupStatus {
+  READY
+  PICKED_UP
+  CANCELLED
+}
+
 model Store {
   id              String   @id @default(cuid())
   name            String
@@ -45,6 +51,7 @@ model Store {
   auditLogs      AuditLog[]
   sales          Sale[]
   stockMovements StockMovement[]
+  pickups        Pickup[]
 }
 
 model User {
@@ -61,6 +68,7 @@ model User {
   auditLogs      AuditLog[]
   sales          Sale[]
   stockMovements StockMovement[]
+  pickedUpPickups Pickup[]        @relation("PickupPickedUpBy")
 }
 
 model Product {
@@ -171,6 +179,26 @@ model StockMovement {
   @@index([productId, createdAt])
   @@index([variantId, createdAt])
   @@index([saleItemId])
+}
+
+model Pickup {
+  id           String       @id @default(cuid())
+  storeId      String
+  customerName String
+  pickupCode   String
+  status       PickupStatus @default(READY)
+  notes        String?
+  pickedUpAt   DateTime?
+  pickedUpById String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  store      Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  pickedUpBy User? @relation("PickupPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, pickupCode])
+  @@index([storeId, status])
+  @@index([customerName])
 }
 
 model AuditLog {
