@@ -83,7 +83,7 @@ export function ProductSearch({
           disabled={pending}
           className="mt-6 min-h-12 cursor-pointer rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {pending ? "..." : "Sök"}
+          {pending ? "Söker..." : "Sök produkter"}
         </button>
       </div>
     </form>

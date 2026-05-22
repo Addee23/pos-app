@@ -15,13 +15,11 @@ const personalNav: NavItem[] = [
 const adminNav: NavItem[] = [
   { href: "/admin/dashboard", label: "Dashboard", shortLabel: "Start" },
   { href: "/kassa", label: "Kassa", shortLabel: "Kassa" },
-  { href: "/admin/products", label: "Produkter", shortLabel: "Varor" },
+  { href: "/admin/products", label: "Produkter", shortLabel: "Produkter" },
   { href: "/sok", label: "Sök", shortLabel: "Sök" },
   { href: "/upphamtning", label: "Upphämtning", shortLabel: "Hämta" },
   { href: "/admin/logs", label: "Logs", shortLabel: "Logs" },
-  { href: "/admin/users", label: "Användare", shortLabel: "Users" },
-  { href: "/admin/reports", label: "Rapporter", shortLabel: "Rapporter" },
-  { href: "/admin/settings", label: "Inställningar", shortLabel: "Inställningar" },
+  { href: "/admin/settings", label: "Settings", shortLabel: "Settings" },
 ];
 
 export function getNavItems(role: Role): NavItem[] {

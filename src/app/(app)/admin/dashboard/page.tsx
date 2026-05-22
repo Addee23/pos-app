@@ -16,16 +16,25 @@ export default async function AdminDashboardPage() {
         </p>
         <h2 className="mt-1 text-xl font-semibold text-zinc-900">Dashboard</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-500">
-          Översikt för sync-status, senaste aktiviteter och fel när de
-          funktionerna byggs.
+          Startpunkt för admin. Härifrån når du produkter, försäljning,
+          upphämtningar, användare, rapporter och settings.
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-3">
+        <div className="rounded-lg border border-zinc-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-zinc-900">
+            Vanliga adminuppgifter
+          </h3>
+          <p className="mt-1 text-xs leading-5 text-zinc-500">
+            Välj vad du vill göra. WooCommerce-sync och API-fel visas här senare
+            när integrationen finns.
+          </p>
+        </div>
         <DashboardLink
           href="/admin/products"
           title="Produkter"
-          text="Hantera lokal produktdata och lager."
+          text="Sök produkter och uppdatera pris, EAN, lager och lagerplats."
         />
         <DashboardLink
           href="/admin/sales"
@@ -50,7 +59,7 @@ export default async function AdminDashboardPage() {
         <DashboardLink
           href="/admin/settings"
           title="Settings"
-          text="Hantera butik och kvittoinställningar."
+          text="Hantera butiksuppgifter, kvittotexter och WooCommerce URL."
         />
       </div>
     </section>

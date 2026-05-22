@@ -100,7 +100,7 @@ export function StoreSettingsForm({ stores, store }: StoreSettingsFormProps) {
       >
         <SettingsSection
           title="Butik"
-          description="Grundinformation som visas internt och senare kan användas på kvitton."
+          description="Grundinformation som visas internt och på kvitto."
         >
           <Field label="Butiksnamn" name="name" defaultValue={store.name} />
           <Field
@@ -117,7 +117,7 @@ export function StoreSettingsForm({ stores, store }: StoreSettingsFormProps) {
 
         <SettingsSection
           title="Kvitto"
-          description="Texter och format som senare används på kvitto eller plocklista."
+          description="Texter och format som används när kvittot skrivs ut."
         >
           <Field
             label="Kvittobredd (mm)"
@@ -151,7 +151,7 @@ export function StoreSettingsForm({ stores, store }: StoreSettingsFormProps) {
 
         <SettingsSection
           title="WooCommerce"
-          description="Fylls i när riktig Woo-åtkomst finns. API-nycklar läggs inte här ännu."
+          description="Fyll i URL nu. API-nycklar och webhooks byggs när riktig åtkomst finns."
         >
           <Field
             label="WooCommerce URL"
@@ -162,7 +162,9 @@ export function StoreSettingsForm({ stores, store }: StoreSettingsFormProps) {
         </SettingsSection>
 
         {error ? <Alert type="error" message={error} /> : null}
-        {success ? <Alert type="success" message="Settings sparades." /> : null}
+        {success ? (
+          <Alert type="success" message="Settings sparades." />
+        ) : null}
 
         <button
           type="submit"

@@ -132,7 +132,8 @@ export function UserManagementClient({
             Ny användare
           </h3>
           <p className="mt-1 text-xs leading-5 text-zinc-500">
-            Lösenordet hash:as på servern innan användaren sparas.
+            Fyll i namn, e-post, roll och butik. Lösenordet hash:as på servern
+            innan användaren sparas.
           </p>
         </div>
 
@@ -154,7 +155,7 @@ export function UserManagementClient({
           disabled={creating || stores.length === 0}
           className="min-h-12 cursor-pointer rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-zinc-300"
         >
-          {creating ? "Skapar..." : "Skapa"}
+          {creating ? "Skapar..." : "Skapa användare"}
         </button>
       </form>
 

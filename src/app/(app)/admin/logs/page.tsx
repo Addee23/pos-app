@@ -58,8 +58,8 @@ export default async function AdminLogsPage() {
       <div className="rounded-lg border border-zinc-200 bg-white p-4">
         <h3 className="text-sm font-semibold text-zinc-900">Sync logs</h3>
         <p className="mt-1 text-sm leading-6 text-zinc-500">
-          WooCommerce-webhooks, API-fel och retries visas här när integrationen
-          är byggd.
+          Inte aktivt ännu. WooCommerce-webhooks, API-fel och retries visas här
+          när integrationen är byggd.
         </p>
       </div>
 
@@ -72,7 +72,8 @@ function AuditLogList({ logs }: { logs: AuditLogWithRelations[] }) {
   if (logs.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500">
-        Inga audit logs har skapats ännu.
+        Inga audit logs har skapats ännu. Ändra en produkt eller variant så
+        visas ändringen här.
       </p>
     );
   }

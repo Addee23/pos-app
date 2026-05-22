@@ -276,7 +276,8 @@ export function KassaClient({ products, store }: KassaClientProps) {
           </p>
           <h2 className="mt-1 text-xl font-semibold text-zinc-900">Kassa</h2>
           <p className="mt-2 text-sm leading-6 text-zinc-500">
-            Sök produkt, välj variant vid behov och lägg varor i varukorgen.
+            Sök på namn eller EAN, välj eventuell variant och slutför köpet när
+            varukorgen stämmer.
           </p>
         </div>
 
@@ -326,7 +327,8 @@ function ProductResultList({
   if (products.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500">
-        Inga produkter hittades.
+        Inga produkter hittades. Prova att söka på produktnamn, EAN eller
+        variant.
       </p>
     );
   }
@@ -439,7 +441,7 @@ function CartPanel({
 
         {cart.length === 0 ? (
           <p className="mt-4 rounded-lg border border-dashed border-zinc-200 px-3 py-6 text-center text-sm text-zinc-500">
-            Inga varor ännu.
+            Varukorgen är tom. Sök fram en produkt och tryck på Lägg till.
           </p>
         ) : (
           <ul className="mt-4 flex flex-col divide-y divide-zinc-100">

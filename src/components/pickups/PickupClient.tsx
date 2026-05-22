@@ -98,7 +98,8 @@ export function PickupClient({ initialPickups }: PickupClientProps) {
           Upphämtningar
         </h2>
         <p className="mt-2 text-sm leading-6 text-zinc-500">
-          Sök på kundnamn eller upphämtningskod och markera ordern som hämtad.
+          Sök på kundnamn eller upphämtningskod. När kunden har fått sin order
+          markerar du den som hämtad.
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
@@ -163,7 +164,8 @@ function PickupList({
   if (pickups.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500">
-        Inga upphämtningar hittades.
+        Inga upphämtningar hittades. Prova kundnamn eller kod, till exempel
+        HAMTA-1001.
       </p>
     );
   }

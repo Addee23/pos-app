@@ -73,14 +73,17 @@ export default async function AdminReportsPage() {
         </p>
         <h2 className="mt-1 text-xl font-semibold text-zinc-900">Rapporter</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-500">
-          Översikt över lokala POS-köp. WooCommerce-data kopplas in senare när
-          integrationen finns.
+          Följ dagens försäljning, snittköp, senaste köp och mest sålda
+          produkter från den lokala kassan.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <MetricCard label="Idag" value={`${formatPrice(todayRevenue)} kr`} />
-        <MetricCard label="Total försäljning" value={`${formatPrice(totalRevenue)} kr`} />
+        <MetricCard
+          label="Total försäljning"
+          value={`${formatPrice(totalRevenue)} kr`}
+        />
         <MetricCard label="Köp" value={String(allSales.length)} />
         <MetricCard label="Snittköp" value={`${formatPrice(averageSale)} kr`} />
       </div>
@@ -165,7 +168,8 @@ function TopProductsList({
 
       {products.length === 0 ? (
         <p className="mt-4 rounded-lg border border-dashed border-zinc-200 px-4 py-8 text-center text-sm text-zinc-500">
-          Inga sålda produkter finns ännu.
+          Inga sålda produkter finns ännu. När köp registreras i kassan visas de
+          mest sålda produkterna här.
         </p>
       ) : (
         <ul className="mt-4 flex flex-col divide-y divide-zinc-100">
@@ -227,7 +231,8 @@ function RecentSalesList({
 
       {sales.length === 0 ? (
         <p className="mt-4 rounded-lg border border-dashed border-zinc-200 px-4 py-8 text-center text-sm text-zinc-500">
-          Inga försäljningar har registrerats ännu.
+          Inga försäljningar har registrerats ännu. Slutför ett köp i kassan så
+          visas det här.
         </p>
       ) : (
         <ul className="mt-4 flex flex-col divide-y divide-zinc-100">
