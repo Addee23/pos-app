@@ -22,8 +22,21 @@ export default async function AdminDashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-3">
-        <DashboardLink href="/admin/products" title="Produkter" text="Hantera lokal produktdata och lager." />
-        <DashboardLink href="/admin/settings" title="Settings" text="Hantera butik och kvittoinställningar." />
+        <DashboardLink
+          href="/admin/products"
+          title="Produkter"
+          text="Hantera lokal produktdata och lager."
+        />
+        <DashboardLink
+          href="/admin/sales"
+          title="Försäljningar"
+          text="Se senaste lokala POS-köp och rader."
+        />
+        <DashboardLink
+          href="/admin/settings"
+          title="Settings"
+          text="Hantera butik och kvittoinställningar."
+        />
       </div>
     </section>
   );

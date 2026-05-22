@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { variantUpdateSchema } from "@/lib/validations/product";
+import { rateLimit } from "@/lib/rate-limit";
 import { isAdmin } from "@/lib/rbac";
 import { createAuditLog } from "@/lib/audit";
 
@@ -17,6 +18,16 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (!isAdmin(session.user.role)) {
     return NextResponse.json({ error: "Åtkomst nekad" }, { status: 403 });
+  }
+
+  const updateLimit = rateLimit({
+    key: `variant-update:${session.user.id}`,
+    limit: 30,
+    windowMs: 60 * 1000,
+  });
+
+  if (!updateLimit.allowed) {
+    return tooManyRequests(updateLimit.retryAfterSeconds);
   }
 
   const { id: productId, variantId } = await context.params;
@@ -93,4 +104,16 @@ async function readJsonBody(
   } catch {
     return { ok: false };
   }
+}
+
+function tooManyRequests(retryAfterSeconds: number) {
+  return NextResponse.json(
+    {
+      error: `För många anrop. Vänta ${retryAfterSeconds} sekunder och försök igen.`,
+    },
+    {
+      status: 429,
+      headers: { "Retry-After": String(retryAfterSeconds) },
+    },
+  );
 }
