@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { AdminDashboardLink } from "@/components/layout/AdminDashboardLink";
 import type { Sale, SaleItem, User } from "@/generated/prisma/client";
 
 type SaleWithRelations = Sale & {
@@ -32,6 +33,7 @@ export default async function AdminSalesPage() {
 
   return (
     <section className="flex flex-col gap-4">
+      <AdminDashboardLink />
       <div className="rounded-lg border border-zinc-200 bg-white p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
           Admin

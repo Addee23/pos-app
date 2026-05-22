@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { AdminDashboardLink } from "@/components/layout/AdminDashboardLink";
 import { ProductList } from "@/components/products/ProductList";
 import { ProductSearch } from "@/components/products/ProductSearch";
 
@@ -48,6 +49,7 @@ export default async function AdminProductsPage({
 
   return (
     <section className="flex flex-col gap-4">
+      <AdminDashboardLink />
       <ProductsHeader productCount={products.length} storeCount={stores.length} />
       <Suspense>
         <ProductSearch

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { AdminDashboardLink } from "@/components/layout/AdminDashboardLink";
 import { ProductAuditLogList } from "@/components/products/ProductAuditLogList";
 import { ProductEditForm } from "@/components/products/ProductEditForm";
 
@@ -50,12 +51,15 @@ export default async function ProductDetailPage({
 
   return (
     <section className="flex flex-col gap-4">
-      <Link
-        href="/admin/products"
-        className="w-fit cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
-      >
-        Tillbaka
-      </Link>
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/admin/products"
+          className="w-fit cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+        >
+          Till produkter
+        </Link>
+        <AdminDashboardLink />
+      </div>
 
       <div className="rounded-lg border border-zinc-200 bg-white p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">

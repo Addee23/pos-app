@@ -33,6 +33,11 @@ export default async function AdminDashboardPage() {
           text="Se senaste lokala POS-köp och rader."
         />
         <DashboardLink
+          href="/admin/logs"
+          title="Logs"
+          text="Se audit logs för produkt- och variantändringar."
+        />
+        <DashboardLink
           href="/admin/settings"
           title="Settings"
           text="Hantera butik och kvittoinställningar."

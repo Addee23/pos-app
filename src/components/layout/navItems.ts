@@ -18,6 +18,7 @@ const adminNav: NavItem[] = [
   { href: "/admin/products", label: "Produkter", shortLabel: "Varor" },
   { href: "/sok", label: "Sök", shortLabel: "Sök" },
   { href: "/upphamtning", label: "Upphämtning", shortLabel: "Hämta" },
+  { href: "/admin/logs", label: "Logs", shortLabel: "Logs" },
   { href: "/admin/settings", label: "Inställningar", shortLabel: "Inställningar" },
 ];
 

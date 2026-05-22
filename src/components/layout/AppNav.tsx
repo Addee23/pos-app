@@ -12,7 +12,11 @@ type AppNavProps = {
 
 export function AppNav({ role, variant }: AppNavProps) {
   const pathname = usePathname();
-  const items = getNavItems(role);
+  const allItems = getNavItems(role);
+  const items =
+    variant === "mobile" && role === "ADMIN"
+      ? allItems.filter((item) => item.href !== "/admin/logs")
+      : allItems;
   const mobileColumns =
     role === "ADMIN"
       ? "0.8fr 0.85fr 0.85fr 0.65fr 0.8fr 1.7fr"
