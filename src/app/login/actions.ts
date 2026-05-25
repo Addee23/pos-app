@@ -2,6 +2,7 @@
 
 import { AuthError } from "next-auth";
 import { signIn } from "@/auth";
+import { rateLimit } from "@/lib/rate-limit";
 import { loginSchema } from "@/lib/validations/auth";
 
 export type LoginState = {
@@ -22,6 +23,17 @@ export async function loginAction(
   }
 
   const callbackUrl = (formData.get("callbackUrl") as string) || "/";
+  const loginLimit = rateLimit({
+    key: `login:${parsed.data.email.toLowerCase()}`,
+    limit: 5,
+    windowMs: 60 * 1000,
+  });
+
+  if (!loginLimit.allowed) {
+    return {
+      error: `För många inloggningsförsök. Vänta ${loginLimit.retryAfterSeconds} sekunder.`,
+    };
+  }
 
   try {
     await signIn("credentials", {

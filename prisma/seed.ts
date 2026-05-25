@@ -1,7 +1,11 @@
 import "dotenv/config";
 import { hash } from "bcryptjs";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
-import { PrismaClient, ProductType } from "../src/generated/prisma/client";
+import {
+  PickupStatus,
+  PrismaClient,
+  ProductType,
+} from "../src/generated/prisma/client";
 
 function createPrismaClient() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -30,7 +34,6 @@ async function main() {
     create: {
       name: "Demo Butik",
       slug: "demo-butik",
-      wooUrl: "https://example.com",
     },
   });
 
@@ -134,6 +137,34 @@ async function main() {
       ean: "7310861234581",
       stockQuantity: 8,
       stockLocation: "Hylla B3",
+    },
+  });
+
+  await prisma.pickup.upsert({
+    where: {
+      storeId_pickupCode: { storeId: store.id, pickupCode: "HAMTA-1001" },
+    },
+    update: {},
+    create: {
+      storeId: store.id,
+      customerName: "Sara Kund",
+      pickupCode: "HAMTA-1001",
+      status: PickupStatus.READY,
+      notes: "Kontrollera legitimation vid utlämning.",
+    },
+  });
+
+  await prisma.pickup.upsert({
+    where: {
+      storeId_pickupCode: { storeId: store.id, pickupCode: "HAMTA-1002" },
+    },
+    update: {},
+    create: {
+      storeId: store.id,
+      customerName: "Ali Kund",
+      pickupCode: "HAMTA-1002",
+      status: PickupStatus.READY,
+      notes: "Betald online.",
     },
   });
 
