@@ -153,7 +153,7 @@ export function UserManagementClient({
         <button
           type="submit"
           disabled={creating || stores.length === 0}
-          className="min-h-12 cursor-pointer rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-zinc-300"
+          className="min-h-12 cursor-pointer rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:shadow-none"
         >
           {creating ? "Skapar..." : "Skapa användare"}
         </button>
@@ -239,7 +239,7 @@ function UserCard({
         <button
           type="submit"
           disabled={isSaving}
-          className="min-h-11 cursor-pointer rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-zinc-300"
+          className="min-h-11 cursor-pointer rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:shadow-none"
         >
           {isSaving ? "Sparar..." : "Spara ändringar"}
         </button>
@@ -280,7 +280,7 @@ function Field({
         type={type}
         defaultValue={defaultValue}
         autoComplete={autoComplete}
-        className="min-h-11 rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10"
+        className="min-h-11 rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
       />
     </label>
   );
@@ -315,7 +315,7 @@ function RoleSelect({
           name={disabled ? undefined : name}
           defaultValue={defaultValue}
           disabled={disabled}
-          className="min-h-11 cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10 disabled:cursor-not-allowed disabled:bg-zinc-100"
+          className="min-h-11 cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:bg-zinc-100"
         >
           <option value="PERSONAL">Personal</option>
           <option value="ADMIN">Admin</option>
@@ -338,7 +338,7 @@ function StoreSelect({
       <select
         name="storeId"
         defaultValue={defaultValue}
-        className="min-h-11 cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10"
+        className="min-h-11 cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
       >
         {stores.map((store) => (
           <option key={store.id} value={store.id}>

@@ -2,10 +2,30 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { Product, ProductVariant } from "@/generated/prisma/client";
+
+export type EditableProduct = {
+  id: string;
+  name: string;
+  slug: string;
+  price: number;
+  ean: string | null;
+  stockQuantity: number;
+  stockLocation: string | null;
+  variants: EditableProductVariant[];
+};
+
+type EditableProductVariant = {
+  id: string;
+  wooVariantId: number;
+  name: string;
+  price: number;
+  ean: string | null;
+  stockQuantity: number;
+  stockLocation: string | null;
+};
 
 type ProductEditFormProps = {
-  product: Product & { variants: ProductVariant[] };
+  product: EditableProduct;
 };
 
 export function ProductEditForm({ product }: ProductEditFormProps) {
@@ -105,7 +125,7 @@ export function ProductEditForm({ product }: ProductEditFormProps) {
         <button
           type="submit"
           disabled={saving}
-          className="min-h-12 cursor-pointer rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-h-12 cursor-pointer rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? "Sparar..." : "Spara produkt"}
         </button>
@@ -137,7 +157,7 @@ function VariantForm({
   variant,
 }: {
   productId: string;
-  variant: ProductVariant;
+  variant: EditableProductVariant;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -224,7 +244,7 @@ function VariantForm({
       <button
         type="submit"
         disabled={saving}
-        className="min-h-11 cursor-pointer rounded-lg border border-zinc-300 bg-white px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+        className="min-h-11 cursor-pointer rounded-lg border border-blue-200 bg-blue-50 px-3 text-sm font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {saving ? "Sparar..." : "Spara variant"}
       </button>
@@ -256,7 +276,7 @@ function Field({
         step={step}
         min={min}
         defaultValue={defaultValue}
-        className="min-h-12 cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10"
+        className="min-h-12 cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
       />
     </label>
   );

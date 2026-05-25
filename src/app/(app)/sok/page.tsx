@@ -99,13 +99,13 @@ function SearchForm({ query }: { query: string }) {
           defaultValue={query}
           placeholder="Namn, EAN, slug eller QR-länk"
           autoComplete="off"
-          className="min-h-12 w-full cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10"
+          className="min-h-12 w-full cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
         />
       </label>
 
       <button
         type="submit"
-        className="mt-3 min-h-12 w-full cursor-pointer rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white"
+        className="mt-3 min-h-12 w-full cursor-pointer rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600"
       >
         Sök
       </button>

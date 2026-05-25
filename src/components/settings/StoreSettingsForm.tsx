@@ -83,7 +83,7 @@ export function StoreSettingsForm({ stores, store }: StoreSettingsFormProps) {
           <select
             value={store.id}
             onChange={(event) => selectStore(event.target.value)}
-            className="min-h-12 cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10"
+            className="min-h-12 cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
           >
             {stores.map((option) => (
               <option key={option.id} value={option.id}>
@@ -169,7 +169,7 @@ export function StoreSettingsForm({ stores, store }: StoreSettingsFormProps) {
         <button
           type="submit"
           disabled={saving}
-          className="min-h-12 cursor-pointer rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-h-12 cursor-pointer rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
         >
           {saving ? "Sparar..." : "Spara settings"}
         </button>
@@ -222,7 +222,7 @@ function Field({
         min={min}
         max={max}
         defaultValue={defaultValue}
-        className="min-h-12 cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10"
+        className="min-h-12 cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
       />
     </label>
   );
@@ -244,7 +244,7 @@ function Textarea({
         name={name}
         defaultValue={defaultValue}
         rows={3}
-        className="min-h-24 cursor-text resize-y rounded-lg border border-zinc-200 bg-white px-3 py-2 text-base font-normal text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10"
+        className="min-h-24 cursor-text resize-y rounded-lg border border-zinc-200 bg-white px-3 py-2 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
       />
     </label>
   );

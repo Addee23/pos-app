@@ -125,7 +125,7 @@ export function PickupClient({ initialPickups }: PickupClientProps) {
         <button
           type="submit"
           disabled={isSearching}
-          className="min-h-11 cursor-pointer rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-zinc-300"
+          className="min-h-11 cursor-pointer rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:shadow-none"
         >
           {isSearching ? "Söker..." : "Sök"}
         </button>
@@ -219,7 +219,7 @@ function PickupCard({
           type="button"
           disabled={isPickedUp || isSaving}
           onClick={() => onComplete(pickup.id)}
-          className="min-h-10 cursor-pointer rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-zinc-300"
+          className="min-h-10 cursor-pointer rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:shadow-none"
         >
           {isPickedUp ? "Hämtad" : isSaving ? "Sparar..." : "Markera hämtad"}
         </button>

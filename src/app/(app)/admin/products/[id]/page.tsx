@@ -4,7 +4,10 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { AdminDashboardLink } from "@/components/layout/AdminDashboardLink";
 import { ProductAuditLogList } from "@/components/products/ProductAuditLogList";
-import { ProductEditForm } from "@/components/products/ProductEditForm";
+import {
+  ProductEditForm,
+  type EditableProduct,
+} from "@/components/products/ProductEditForm";
 
 type ProductDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -49,6 +52,25 @@ export default async function ProductDetailPage({
     take: 10,
   });
 
+  const editableProduct: EditableProduct = {
+    id: product.id,
+    name: product.name,
+    slug: product.slug,
+    price: Number(product.price),
+    ean: product.ean,
+    stockQuantity: product.stockQuantity,
+    stockLocation: product.stockLocation,
+    variants: product.variants.map((variant) => ({
+      id: variant.id,
+      wooVariantId: variant.wooVariantId,
+      name: variant.name,
+      price: Number(variant.price),
+      ean: variant.ean,
+      stockQuantity: variant.stockQuantity,
+      stockLocation: variant.stockLocation,
+    })),
+  };
+
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-2">
@@ -76,7 +98,7 @@ export default async function ProductDetailPage({
         </dl>
       </div>
 
-      <ProductEditForm product={product} />
+      <ProductEditForm product={editableProduct} />
       <ProductAuditLogList logs={auditLogs} />
     </section>
   );

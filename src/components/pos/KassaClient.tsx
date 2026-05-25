@@ -289,7 +289,7 @@ export function KassaClient({ products, store }: KassaClientProps) {
             type="search"
             placeholder="Namn, EAN eller variant"
             autoComplete="off"
-            className="min-h-12 w-full cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10"
+            className="min-h-12 w-full cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
           />
         </label>
 
@@ -379,7 +379,7 @@ function ProductCard({
           type="button"
           onClick={() => onAddProduct(product)}
           disabled={product.stockQuantity <= 0}
-          className="mt-3 min-h-11 w-full cursor-pointer rounded-lg bg-zinc-900 px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-3 min-h-11 w-full cursor-pointer rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Lägg till {formatPrice(product.price)} kr
         </button>
@@ -391,7 +391,7 @@ function ProductCard({
               type="button"
               onClick={() => onAddVariant(product, variant)}
               disabled={variant.stockQuantity <= 0}
-              className="flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-3 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left text-sm transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <span className="min-w-0">
                 <span className="block font-semibold text-zinc-900">
@@ -401,8 +401,13 @@ function ProductCard({
                   EAN {variant.ean ?? "-"} · Lager {variant.stockQuantity}
                 </span>
               </span>
-              <span className="shrink-0 font-semibold text-zinc-900">
-                {formatPrice(variant.price)} kr
+              <span className="flex shrink-0 flex-col items-end gap-1">
+                <span className="font-semibold text-zinc-900">
+                  {formatPrice(variant.price)} kr
+                </span>
+                <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
+                  Lägg till
+                </span>
               </span>
             </button>
           ))}
@@ -499,7 +504,7 @@ function CartPanel({
           type="button"
           onClick={onCompleteSale}
           disabled={saving || cart.length === 0}
-          className="mt-4 min-h-12 w-full cursor-pointer rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-4 min-h-12 w-full cursor-pointer rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? "Slutför..." : "Slutför köp"}
         </button>

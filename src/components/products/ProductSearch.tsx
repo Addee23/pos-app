@@ -57,7 +57,7 @@ export function ProductSearch({
           type="search"
           defaultValue={initialQuery}
           placeholder="Namn, EAN eller slug"
-          className="min-h-12 w-full cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10"
+          className="min-h-12 w-full cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
         />
       </label>
 
@@ -67,7 +67,7 @@ export function ProductSearch({
           <select
             name="storeId"
             defaultValue={initialStoreId}
-            className="min-h-12 min-w-0 cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-zinc-400"
+            className="min-h-12 min-w-0 cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
           >
             <option value="">Alla butiker</option>
             {stores.map((store) => (
@@ -81,7 +81,7 @@ export function ProductSearch({
         <button
           type="submit"
           disabled={pending}
-          className="mt-6 min-h-12 cursor-pointer rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-6 min-h-12 cursor-pointer rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {pending ? "Söker..." : "Sök produkter"}
         </button>
