@@ -37,6 +37,15 @@ model Store {
   slug            String   @unique
   logoUrl         String?
   wooUrl          String?
+  wooConsumerKey  String?  @db.Text
+  wooConsumerSecret String? @db.Text
+  wooWebhookSecret  String? @db.Text
+  smtpHost       String?
+  smtpPort       Int?
+  smtpSecure     Boolean  @default(false)
+  smtpUser       String?  @db.Text
+  smtpPass       String?  @db.Text
+  smtpFrom       String?
   address         String?
   receiptFooter   String?
   returnText      String?
@@ -69,6 +78,7 @@ model User {
   sales          Sale[]
   stockMovements StockMovement[]
   pickedUpPickups Pickup[]        @relation("PickupPickedUpBy")
+  cancelledPickups Pickup[]        @relation("PickupCancelledBy")
 }
 
 model Product {
@@ -81,6 +91,12 @@ model Product {
   productType   ProductType @default(SIMPLE)
   price         Decimal     @db.Decimal(10, 2)
   ean           String?
+  imageUrl      String?     @db.Text
+  metaDescription String?   @db.Text
+  shortDescription String?  @db.Text
+  category      String?
+  brand         String?
+  country       String?
   stockQuantity Int         @default(0)
   stockLocation String?
   createdAt     DateTime    @default(now())
@@ -90,10 +106,14 @@ model Product {
   variants       ProductVariant[]
   saleItems      SaleItem[]
   stockMovements StockMovement[]
+  pickupItems    PickupItem[]
 
   @@unique([storeId, wooProductId])
   @@index([storeId, name])
   @@index([storeId, ean])
+  @@index([storeId, category])
+  @@index([storeId, brand])
+  @@index([storeId, country])
   @@index([slug])
 }
 
@@ -104,6 +124,9 @@ model ProductVariant {
   name          String
   price         Decimal  @db.Decimal(10, 2)
   ean           String?
+  imageUrl      String?  @db.Text
+  metaDescription String? @db.Text
+  shortDescription String? @db.Text
   stockQuantity Int      @default(0)
   stockLocation String?
   createdAt     DateTime @default(now())
@@ -112,6 +135,7 @@ model ProductVariant {
   product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   saleItems      SaleItem[]
   stockMovements StockMovement[]
+  pickupItems    PickupItem[]
 
   @@unique([productId, wooVariantId])
   @@index([ean])
@@ -185,20 +209,50 @@ model Pickup {
   id           String       @id @default(cuid())
   storeId      String
   customerName String
+  customerEmail String?
   pickupCode   String
   status       PickupStatus @default(READY)
   notes        String?
+  readyEmailSentAt DateTime?
   pickedUpAt   DateTime?
   pickedUpById String?
+  cancelledAt  DateTime?
+  cancelledById String?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
   store      Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
   pickedUpBy User? @relation("PickupPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
+  cancelledBy User? @relation("PickupCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  items      PickupItem[]
 
   @@unique([storeId, pickupCode])
   @@index([storeId, status])
   @@index([customerName])
+  @@index([customerEmail])
+  @@index([cancelledById])
+}
+
+model PickupItem {
+  id              String   @id @default(cuid())
+  pickupId        String
+  productId       String?
+  variantId       String?
+  productName     String
+  variantName     String?
+  productSlug     String?
+  productImageUrl String?  @db.Text
+  quantity        Int      @default(1)
+  createdAt       DateTime @default(now())
+
+  pickup  Pickup          @relation(fields: [pickupId], references: [id], onDelete: Cascade)
+  product Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([pickupId])
+  @@index([productId])
+  @@index([variantId])
+  @@index([productSlug])
 }
 
 model AuditLog {

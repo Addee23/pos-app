@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { PickupClient } from "@/components/pickups/PickupClient";
+import { loadPickupDashboard } from "@/lib/pickup-dashboard-data";
+import { processPendingPickupEmails } from "@/lib/pickup-notifications";
 
 export default async function UpphämtningPage() {
   const session = await auth();
@@ -17,24 +18,18 @@ export default async function UpphämtningPage() {
     );
   }
 
-  // Server-komponenten laddar första listan direkt.
-  // Client-komponenten tar sedan över sökning och "markera hämtad".
-  const pickups = await prisma.pickup.findMany({
-    where: { storeId: session.user.storeId },
-    include: {
-      pickedUpBy: { select: { name: true, email: true } },
-    },
-    orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-    take: 30,
-  });
+  try {
+    await processPendingPickupEmails(session.user.storeId);
+  } catch (error) {
+    console.error("Kunde inte skicka väntande upphämtningsmail:", error);
+  }
+
+  const initialDashboard = await loadPickupDashboard(session.user.storeId);
 
   return (
     <PickupClient
-      initialPickups={pickups.map((pickup) => ({
-        ...pickup,
-        pickedUpAt: pickup.pickedUpAt?.toISOString() ?? null,
-        createdAt: pickup.createdAt.toISOString(),
-      }))}
+      initialDashboard={initialDashboard}
+      currentRole={session.user.role}
     />
   );
 }

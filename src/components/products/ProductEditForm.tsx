@@ -1,5 +1,6 @@
 "use client";
 
+import { TaxonomyFields } from "@/components/products/TaxonomyFields";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -11,6 +12,9 @@ export type EditableProduct = {
   ean: string | null;
   stockQuantity: number;
   stockLocation: string | null;
+  category: string | null;
+  brand: string | null;
+  country: string | null;
   variants: EditableProductVariant[];
 };
 
@@ -44,6 +48,9 @@ export function ProductEditForm({ product }: ProductEditFormProps) {
       ean: formData.get("ean"),
       stockQuantity: formData.get("stockQuantity"),
       stockLocation: formData.get("stockLocation"),
+      category: formData.get("category"),
+      brand: formData.get("brand"),
+      country: formData.get("country"),
     };
 
     try {
@@ -117,6 +124,20 @@ export function ProductEditForm({ product }: ProductEditFormProps) {
             name="stockLocation"
             defaultValue={product.stockLocation ?? ""}
           />
+        </div>
+
+        <div className="mt-4 border-t border-zinc-100 pt-4">
+          <h3 className="text-sm font-semibold text-zinc-900">Klassificering</h3>
+          <p className="mt-1 text-xs text-zinc-500">
+            Kategori, varumärke och ursprungsland styr filter i produktlistan.
+          </p>
+          <div className="mt-3">
+            <TaxonomyFields
+              category={product.category}
+              brand={product.brand}
+              country={product.country}
+            />
+          </div>
         </div>
 
         {error ? <Alert type="error" message={error} /> : null}
@@ -259,10 +280,12 @@ function Field({
   type = "text",
   step,
   min,
+  placeholder,
 }: {
   label: string;
   name: string;
   defaultValue?: string | number;
+  placeholder?: string;
   type?: string;
   step?: string;
   min?: string;
@@ -276,6 +299,7 @@ function Field({
         step={step}
         min={min}
         defaultValue={defaultValue}
+        placeholder={placeholder}
         className="min-h-12 cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
       />
     </label>

@@ -1,0 +1,13 @@
+[
+  {
+    "id": 10001,
+    "name": "Exempelprodukt",
+    "slug": "exempelprodukt",
+    "type": "simple",
+    "sku": "EX-001",
+    "price": "99.00",
+    "stock_quantity": 10,
+    "short_description": "Kort beskrivning som visas i mail och katalog.",
+    "images": [{ "src": "https://example.com/bild.jpg" }]
+  }
+]

@@ -1,5 +1,5 @@
-import Link from "next/link";
 import type { Product, ProductVariant, Store } from "@/generated/prisma/client";
+import { ProductActions } from "@/components/products/ProductActions";
 
 export type ProductWithRelations = Product & {
   store: Pick<Store, "id" | "name">;
@@ -22,13 +22,17 @@ export function ProductList({ products }: ProductListProps) {
   return (
     <ul className="flex flex-col gap-3">
       {products.map((product) => (
-        <li key={product.id}>
-          <Link
-            href={`/admin/products/${product.id}`}
-            className="block cursor-pointer rounded-lg border border-zinc-200 bg-white p-4 transition hover:border-zinc-300 hover:shadow-sm"
-          >
-            <ProductCard product={product} />
-          </Link>
+        <li
+          key={product.id}
+          className="rounded-[1.75rem] border border-[#dfd4c6] bg-[#f8f4ed] p-3 shadow-sm"
+        >
+          <ProductCard product={product} />
+          <div className="mt-3 border-t border-[#dfd4c6] pt-3">
+            <ProductActions
+              productId={product.id}
+              productName={product.name}
+            />
+          </div>
         </li>
       ))}
     </ul>
@@ -38,25 +42,44 @@ export function ProductList({ products }: ProductListProps) {
 function ProductCard({ product }: { product: ProductWithRelations }) {
   return (
     <article className="flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-base font-semibold text-zinc-900">
-            {product.name}
-          </p>
-          <p className="mt-0.5 text-xs text-zinc-500">{product.store.name}</p>
+      <div className="grid grid-cols-[88px_1fr] gap-3">
+        <ProductImage imageUrl={product.imageUrl} name={product.name} />
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="line-clamp-2 text-base font-bold leading-5 text-[#43342c]">
+                {product.name}
+              </p>
+              <p className="mt-1 text-xs font-semibold text-orange-700">
+                {product.store.name}
+              </p>
+            </div>
+
+            <span className="shrink-0 rounded-full bg-white px-2 py-1 text-xs font-bold text-[#6a5b50]">
+              {product.productType === "VARIABLE" ? "Variabel" : "Enkel"}
+            </span>
+          </div>
+
+          {product.metaDescription ? (
+            <p className="mt-2 line-clamp-3 text-xs leading-5 text-[#75675d]">
+              {product.metaDescription}
+            </p>
+          ) : null}
         </div>
-        <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-700">
-          {product.productType === "VARIABLE" ? "Variabel" : "Enkel"}
-        </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-sm">
+      <div className="overflow-hidden rounded-2xl border border-[#dfd4c6] text-sm">
         <InfoBox label="Pris" value={`${formatPrice(product.price)} kr`} />
-        <InfoBox label="Lager" value={String(product.stockQuantity)} />
+        <InfoBox label="Lager" value={`${product.stockQuantity} st`} />
+        <InfoBox label="EAN" value={product.ean ?? "-"} />
+        <InfoBox label="Lagerplats" value={product.stockLocation ?? "-"} />
       </div>
 
-      <div className="flex flex-wrap gap-2 text-xs text-zinc-500">
-        {product.ean ? <Chip label={`EAN ${product.ean}`} /> : null}
+      <div className="flex flex-wrap gap-2 text-xs text-[#75675d]">
+        {product.category ? <Chip label={product.category} /> : null}
+        {product.brand ? <Chip label={product.brand} /> : null}
+        {product.country ? <Chip label={product.country} /> : null}
         <Chip label={`Slug ${product.slug}`} />
         {product.productType === "VARIABLE" ? (
           <Chip label={`${product.variants.length} varianter`} />
@@ -66,18 +89,45 @@ function ProductCard({ product }: { product: ProductWithRelations }) {
   );
 }
 
+function ProductImage({
+  imageUrl,
+  name,
+}: {
+  imageUrl: string | null;
+  name: string;
+}) {
+  if (!imageUrl) {
+    return (
+      <div className="flex h-28 w-[88px] shrink-0 items-center justify-center rounded-3xl bg-white text-xs font-bold text-orange-600">
+        Bild
+      </div>
+    );
+  }
+
+  return (
+    <div
+      aria-label={name}
+      role="img"
+      className="h-28 w-[88px] shrink-0 rounded-3xl border border-[#dfd4c6] bg-white bg-contain bg-center bg-no-repeat"
+      style={{ backgroundImage: `url("${imageUrl}")` }}
+    />
+  );
+}
+
 function InfoBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-zinc-50 px-3 py-2">
-      <p className="text-xs font-medium text-zinc-400">{label}</p>
-      <p className="mt-0.5 font-semibold text-zinc-900">{value}</p>
+    <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-[#dfd4c6] bg-[#f3eee5] px-3 py-2 last:border-b-0">
+      <p className="text-xs font-bold text-[#6a5b50]">{label}</p>
+      <p className="max-w-36 break-words text-right text-xs font-bold text-blue-700">
+        {value}
+      </p>
     </div>
   );
 }
 
 function Chip({ label }: { label: string }) {
   return (
-    <span className="max-w-full truncate rounded-full bg-zinc-50 px-2 py-1">
+    <span className="max-w-full truncate rounded-full bg-white px-2 py-1 font-semibold">
       {label}
     </span>
   );

@@ -1,0 +1,24 @@
+{
+  "id": 5001,
+  "number": "5001",
+  "status": "processing",
+  "billing": {
+    "first_name": "Test",
+    "last_name": "Kund",
+    "email": "adiiinaaaa86@gmail.com"
+  },
+  "line_items": [
+    {
+      "product_id": 1001,
+      "variation_id": 0,
+      "name": "Cigarr Premium No.1",
+      "quantity": 1
+    }
+  ],
+  "shipping_lines": [
+    {
+      "method_id": "local_pickup",
+      "method_title": "Hämta i butik"
+    }
+  ]
+}

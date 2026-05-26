@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { pickupSearchSchema } from "@/lib/validations/pickup";
+
+type PickupSearchMode = "code" | "text" | "url";
+
+type NormalizedPickupSearch = {
+  mode: PickupSearchMode;
+  term: string;
+};
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -39,22 +47,27 @@ export async function GET(request: Request) {
     );
   }
 
-  const query = parsed.data.q;
+  const search = normalizePickupSearch(parsed.data.q ?? "");
 
   const pickups = await prisma.pickup.findMany({
     where: {
       storeId: session.user.storeId,
-      ...(query
-        ? {
-            OR: [
-              { customerName: { contains: query } },
-              { pickupCode: { contains: query } },
-            ],
-          }
-        : {}),
+      ...(search ? buildPickupSearchWhere(search) : {}),
     },
     include: {
       pickedUpBy: { select: { name: true, email: true } },
+      cancelledBy: { select: { name: true, email: true } },
+      items: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          productName: true,
+          variantName: true,
+          productSlug: true,
+          productImageUrl: true,
+          quantity: true,
+        },
+      },
     },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     take: 30,
@@ -73,4 +86,77 @@ function tooManyRequests(retryAfterSeconds: number) {
       headers: { "Retry-After": String(retryAfterSeconds) },
     },
   );
+}
+
+function normalizePickupSearch(query: string): NormalizedPickupSearch | null {
+  const rawQuery = query.trim();
+
+  if (rawQuery.length === 0) {
+    return null;
+  }
+
+  // Samma idé som produktflödet:
+  // https-länk betyder att vi letar efter produktens slug i upphämtningen.
+  if (/^https?:\/\//i.test(rawQuery)) {
+    const slug = extractSlugFromUrl(rawQuery);
+
+    return {
+      mode: "url",
+      term: slug || rawQuery,
+    };
+  }
+
+  // En upphämtningskod kan vara både ren siffra och t.ex. HAMTA-1001.
+  const looksLikePickupCode = /^[a-zåäö0-9-]+$/i.test(rawQuery) && /\d/.test(rawQuery);
+
+  return {
+    mode: looksLikePickupCode ? "code" : "text",
+    term: rawQuery,
+  };
+}
+
+function buildPickupSearchWhere(
+  search: NormalizedPickupSearch,
+): Prisma.PickupWhereInput {
+  if (search.mode === "url") {
+    return {
+      items: {
+        some: {
+          OR: [
+            { productSlug: search.term },
+            { productSlug: { contains: search.term } },
+          ],
+        },
+      },
+    };
+  }
+
+  if (search.mode === "code") {
+    return {
+      OR: [
+        { pickupCode: search.term },
+        { pickupCode: { contains: search.term } },
+      ],
+    };
+  }
+
+  return {
+    OR: [
+      { customerName: { contains: search.term } },
+      { pickupCode: { contains: search.term } },
+      { items: { some: { productName: { contains: search.term } } } },
+      { items: { some: { productSlug: { contains: search.term } } } },
+    ],
+  };
+}
+
+function extractSlugFromUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    const parts = url.pathname.split("/").filter(Boolean);
+
+    return parts.at(-1) ?? "";
+  } catch {
+    return "";
+  }
 }

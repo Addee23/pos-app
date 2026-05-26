@@ -16,10 +16,28 @@ const optionalUrl = z
     { message: "Måste vara en giltig URL" },
   );
 
+const optionalSecret = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => (value === "" ? undefined : value));
+
 export const storeSettingsSchema = z.object({
   name: z.string().trim().min(1, "Butiksnamn krävs"),
   logoUrl: optionalUrl,
   wooUrl: optionalUrl,
+  wooConsumerKey: optionalSecret,
+  wooConsumerSecret: optionalSecret,
+  wooWebhookSecret: optionalSecret,
+  smtpHost: optionalText,
+  smtpPort: z.coerce.number().int().min(1).max(65535).optional().nullable(),
+  smtpSecure: z.coerce.boolean().default(false),
+  smtpUser: optionalSecret,
+  smtpPass: optionalSecret,
+  smtpFrom: optionalText.refine(
+    (value) => value === null || value.includes("@"),
+    { message: "Måste innehålla en e-postadress" },
+  ),
   address: optionalText,
   receiptFooter: optionalText,
   returnText: optionalText,
@@ -33,3 +51,7 @@ export const storeSettingsSchema = z.object({
 });
 
 export type StoreSettingsInput = z.infer<typeof storeSettingsSchema>;
+
+export const testEmailSchema = z.object({
+  recipient: z.string().trim().email("Ange en giltig e-postadress"),
+});

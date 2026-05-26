@@ -11,18 +11,21 @@ type AppNavProps = {
   variant: "desktop" | "mobile";
 };
 
+const visibleAdminItems = 4;
+
 export function AppNav({ role, variant }: AppNavProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const items = getNavItems(role);
-  const primaryMobileItems = role === "ADMIN" ? items.slice(0, 4) : items;
-  const moreMobileItems = role === "ADMIN" ? items.slice(4) : [];
+  const primaryMobileItems =
+    role === "ADMIN" ? items.slice(0, visibleAdminItems) : items;
+  const menuMobileItems = role === "ADMIN" ? items.slice(visibleAdminItems) : [];
   const mobileItems =
     role === "ADMIN"
       ? [
           ...primaryMobileItems,
-          { href: "#more", label: "Mer", shortLabel: "Mer" },
+          { href: "#menu", label: "Mer", shortLabel: "Mer", icon: "\u2630" },
         ]
       : primaryMobileItems;
   const mobileColumns = `repeat(${mobileItems.length}, minmax(0, 1fr))`;
@@ -34,70 +37,44 @@ export function AppNav({ role, variant }: AppNavProps) {
   }, [items, router]);
 
   if (variant === "desktop") {
-    return (
-      <nav aria-label="Huvudnavigation" className="hidden md:block">
-        <ul className="flex flex-wrap items-center gap-1.5 rounded-lg bg-zinc-100/80 p-1">
-          {items.map((item) => {
-            const active = isActive(pathname, item.href);
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  prefetch
-                  onMouseEnter={() => router.prefetch(item.href)}
-                  className={`inline-flex min-h-9 cursor-pointer items-center rounded-md px-3 text-sm font-semibold transition ${
-                    active
-                      ? "bg-white text-blue-700 shadow-sm"
-                      : "text-zinc-600 hover:bg-white/70 hover:text-blue-700"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-    );
+    return null;
   }
 
   return (
     <nav
       aria-label="Huvudnavigation"
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200 bg-white/95 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur md:hidden"
+      className="fixed bottom-0 left-1/2 z-50 w-full max-w-[430px] -translate-x-1/2 px-4 pb-[calc(0.7rem+env(safe-area-inset-bottom))]"
     >
       <ul
-        className="mx-auto grid max-w-xl gap-1"
-        style={{
-          gridTemplateColumns: mobileColumns,
-        }}
+        className="mx-auto grid rounded-[1.65rem] border border-zinc-200 bg-white/95 p-2 shadow-[0_18px_45px_rgba(15,23,42,0.16)] backdrop-blur"
+        style={{ gridTemplateColumns: mobileColumns }}
       >
         {mobileItems.map((item) => {
-          if (item.href === "#more") {
+          if (item.href === "#menu") {
             return (
               <li
                 key={item.href}
                 className="relative min-w-0"
-                onMouseLeave={() => setMoreOpen(false)}
+                onMouseLeave={() => setMenuOpen(false)}
               >
-                {moreOpen ? (
+                {menuOpen ? (
                   <div
-                    id="mobile-more-menu"
+                    id="mobile-menu"
                     className="absolute bottom-full right-0 w-52 pb-2"
                   >
-                    <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-xl shadow-zinc-900/10">
+                    <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-xl shadow-zinc-900/10">
                       <p className="px-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                        Fler sidor
+                        Mer
                       </p>
                       <ul className="mt-2 grid grid-cols-1 gap-1">
-                        {moreMobileItems.map((moreItem) => (
-                          <li key={moreItem.href} className="min-w-0">
+                        {menuMobileItems.map((menuItem) => (
+                          <li key={menuItem.href} className="min-w-0">
                             <MobileNavLink
-                              item={moreItem}
-                              label={moreItem.label}
-                              active={isActive(pathname, moreItem.href)}
-                              onClick={() => setMoreOpen(false)}
-                              onMouseEnter={() => router.prefetch(moreItem.href)}
+                              item={menuItem}
+                              label={menuItem.label}
+                              active={isActive(pathname, menuItem.href)}
+                              onClick={() => setMenuOpen(false)}
+                              onMouseEnter={() => router.prefetch(menuItem.href)}
                             />
                           </li>
                         ))}
@@ -109,20 +86,27 @@ export function AppNav({ role, variant }: AppNavProps) {
                   type="button"
                   title={item.label}
                   aria-label={item.label}
-                  aria-expanded={moreOpen}
-                  aria-controls="mobile-more-menu"
-                  onClick={() => setMoreOpen((open) => !open)}
+                  aria-expanded={menuOpen}
+                  aria-controls="mobile-menu"
+                  onClick={() => setMenuOpen((open) => !open)}
                   onMouseEnter={() => {
-                    for (const moreItem of moreMobileItems) {
-                      router.prefetch(moreItem.href);
+                    for (const menuItem of menuMobileItems) {
+                      router.prefetch(menuItem.href);
                     }
                   }}
-                  className={`flex min-h-11 w-full min-w-0 cursor-pointer items-center justify-center rounded-lg px-1 text-center text-[10px] font-semibold leading-tight transition min-[380px]:text-[11px] ${
-                    moreOpen
-                      ? "bg-accent text-accent-foreground shadow-sm shadow-blue-200"
-                      : "text-zinc-500 hover:bg-blue-50 hover:text-blue-700"
+                  className={`flex min-h-12 w-full min-w-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl px-1 text-center text-[10px] font-bold leading-tight transition min-[380px]:text-[11px] ${
+                    menuOpen
+                      ? "text-blue-600"
+                      : "text-zinc-400 hover:text-blue-600"
                   }`}
                 >
+                  <span
+                    className={`flex size-7 items-center justify-center rounded-full text-base leading-none transition ${
+                      menuOpen ? "bg-blue-50" : "bg-transparent"
+                    }`}
+                  >
+                    {item.icon}
+                  </span>
                   <span className="block max-w-full truncate">
                     {item.shortLabel}
                   </span>
@@ -136,7 +120,7 @@ export function AppNav({ role, variant }: AppNavProps) {
             <li key={item.href} className="min-w-0">
               <MobileNavLink
                 item={item}
-                active={!moreOpen && active}
+                active={!menuOpen && active}
                 onMouseEnter={() => router.prefetch(item.href)}
               />
             </li>
@@ -168,12 +152,19 @@ function MobileNavLink({
       aria-label={item.label}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
-      className={`flex min-h-11 min-w-0 cursor-pointer items-center justify-center rounded-lg px-1 text-center text-[10px] font-semibold leading-tight transition min-[380px]:text-[11px] ${
+      className={`flex min-h-12 min-w-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl px-1 text-center text-[10px] font-bold leading-tight transition min-[380px]:text-[11px] ${
         active
-          ? "bg-accent text-accent-foreground shadow-sm shadow-blue-200"
-          : "text-zinc-500 hover:bg-blue-50 hover:text-blue-700"
+          ? "text-blue-600"
+          : "text-zinc-400 hover:text-blue-600"
       }`}
     >
+      <span
+        className={`flex size-7 items-center justify-center rounded-full text-base leading-none transition ${
+          active ? "bg-blue-50" : "bg-transparent"
+        }`}
+      >
+        {item.icon}
+      </span>
       <span className="block max-w-full truncate">{label}</span>
     </Link>
   );
