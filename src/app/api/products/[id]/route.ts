@@ -99,6 +99,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       ean: data.ean,
       stockQuantity: data.stockQuantity,
       stockLocation: data.stockLocation,
+      category: data.category,
+      brand: data.brand,
+      country: data.country,
     };
 
     const product = await prisma.product.update({
@@ -110,7 +113,15 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
     });
 
-    const fields = ["price", "ean", "stockQuantity", "stockLocation"] as const;
+    const fields = [
+      "price",
+      "ean",
+      "stockQuantity",
+      "stockLocation",
+      "category",
+      "brand",
+      "country",
+    ] as const;
     for (const field of fields) {
       const oldVal = String(existing[field] ?? "");
       const newVal = String(product[field] ?? "");
@@ -132,6 +143,63 @@ export async function PATCH(request: Request, context: RouteContext) {
     console.error(error);
     return NextResponse.json(
       { error: "Kunde inte spara produkten" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Ej inloggad" }, { status: 401 });
+  }
+
+  if (!isAdmin(session.user.role)) {
+    return NextResponse.json({ error: "Åtkomst nekad" }, { status: 403 });
+  }
+
+  const deleteLimit = rateLimit({
+    key: `product-delete:${session.user.id}`,
+    limit: 20,
+    windowMs: 60 * 1000,
+  });
+
+  if (!deleteLimit.allowed) {
+    return tooManyRequests(deleteLimit.retryAfterSeconds);
+  }
+
+  const { id } = await context.params;
+
+  try {
+    const existing = await prisma.product.findUnique({
+      where: { id },
+      select: { id: true, name: true, storeId: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Produkten hittades inte" },
+        { status: 404 },
+      );
+    }
+
+    await prisma.product.delete({ where: { id } });
+
+    await createAuditLog({
+      userId: session.user.id,
+      storeId: existing.storeId,
+      entityType: "Product",
+      entityId: existing.id,
+      field: "deleted",
+      oldValue: existing.name,
+      newValue: null,
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json(
+      { error: "Kunde inte ta bort produkten" },
       { status: 500 },
     );
   }

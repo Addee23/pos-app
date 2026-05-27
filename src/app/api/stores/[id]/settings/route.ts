@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { isAdmin } from "@/lib/rbac";
+import { encryptSecret } from "@/lib/secret-crypto";
 import { storeSettingsSchema } from "@/lib/validations/settings";
 
 type RouteContext = {
@@ -53,16 +54,36 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
+    const {
+      wooConsumerKey,
+      wooConsumerSecret,
+      wooWebhookSecret,
+      smtpUser,
+      smtpPass,
+      ...settingsData
+    } = parsed.data;
+
     const store = await prisma.store.update({
       where: { id },
-      data: parsed.data,
+      data: {
+        ...settingsData,
+        ...(wooConsumerKey ? { wooConsumerKey: encryptSecret(wooConsumerKey) } : {}),
+        ...(wooConsumerSecret
+          ? { wooConsumerSecret: encryptSecret(wooConsumerSecret) }
+          : {}),
+        ...(wooWebhookSecret
+          ? { wooWebhookSecret: encryptSecret(wooWebhookSecret) }
+          : {}),
+        ...(smtpUser ? { smtpUser: encryptSecret(smtpUser) } : {}),
+        ...(smtpPass ? { smtpPass: encryptSecret(smtpPass) } : {}),
+      },
     });
 
     return NextResponse.json(store);
   } catch (error) {
     console.error(error);
     return NextResponse.json(
-      { error: "Kunde inte spara settings" },
+      { error: "Kunde inte spara inställningar" },
       { status: 500 },
     );
   }

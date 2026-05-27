@@ -30,3 +30,55 @@ select,
 textarea {
   -webkit-tap-highlight-color: transparent;
 }
+
+@keyframes pickup-tab-blink {
+  0%,
+  100% {
+    background-color: #fff7ed;
+    border-color: #fb923c;
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.55);
+    transform: scale(1);
+  }
+  50% {
+    background-color: #ffedd5;
+    border-color: #ea580c;
+    box-shadow: 0 0 0 5px rgba(249, 115, 22, 0.45);
+    transform: scale(1.02);
+  }
+}
+
+.pickup-tab-blink {
+  animation: pickup-tab-blink 0.85s ease-in-out infinite;
+  border-width: 2px;
+}
+
+@keyframes pickup-tab-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(1.5);
+  }
+}
+
+.pickup-tab-dot {
+  animation: pickup-tab-dot 0.85s ease-in-out infinite;
+}
+
+@keyframes pickup-refresh-flash {
+  0% {
+    background-color: #ecfdf5;
+    color: #047857;
+  }
+  100% {
+    background-color: transparent;
+    color: inherit;
+  }
+}
+
+.pickup-refresh-flash {
+  animation: pickup-refresh-flash 1.4s ease-out;
+}

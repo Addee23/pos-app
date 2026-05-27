@@ -115,29 +115,19 @@ export function UserManagementClient({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        <SummaryBox label="Användare" value={String(users.length)} />
-        <SummaryBox
-          label="Admins"
-          value={String(users.filter((user) => user.role === "ADMIN").length)}
-        />
-      </div>
-
       <form
         action={createUser}
-        className="flex flex-col gap-4 rounded-lg border border-zinc-200 bg-white p-4"
+        className="flex flex-col gap-4 rounded-3xl border border-zinc-200/80 bg-white p-4 shadow-sm"
       >
         <div>
-          <h3 className="text-sm font-semibold text-zinc-900">
-            Ny användare
-          </h3>
+          <h3 className="text-sm font-bold text-zinc-950">Ny användare</h3>
           <p className="mt-1 text-xs leading-5 text-zinc-500">
-            Fyll i namn, e-post, roll och butik. Lösenordet hash:as på servern
-            innan användaren sparas.
+            Fyll i namn, e-post, roll och butik. Personal kan byta eget
+            lösenord i profilen efter inloggning.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Namn" name="name" autoComplete="name" />
           <Field label="E-post" name="email" type="email" autoComplete="email" />
           <Field
@@ -147,13 +137,17 @@ export function UserManagementClient({
             autoComplete="new-password"
           />
           <RoleSelect name="role" defaultValue="PERSONAL" />
-          <StoreSelect stores={stores} defaultValue={stores[0]?.id ?? ""} />
+          <StoreSelect
+            stores={stores}
+            defaultValue={stores[0]?.id ?? ""}
+            className="sm:col-span-2"
+          />
         </div>
 
         <button
           type="submit"
           disabled={creating || stores.length === 0}
-          className="min-h-12 cursor-pointer rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:shadow-none"
+          className="min-h-12 cursor-pointer rounded-2xl bg-violet-600 px-4 text-sm font-bold text-white shadow-sm shadow-violet-200 transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:shadow-none"
         >
           {creating ? "Skapar..." : "Skapa användare"}
         </button>
@@ -163,13 +157,12 @@ export function UserManagementClient({
       {error ? <Alert type="error" message={error} /> : null}
 
       <section className="flex flex-col gap-3">
-        <div className="rounded-lg border border-zinc-200 bg-white p-4">
-          <h3 className="text-sm font-semibold text-zinc-900">
+        <div className="rounded-3xl border border-zinc-200/80 bg-white px-4 py-3 shadow-sm">
+          <h3 className="text-sm font-bold text-zinc-950">
             Befintliga användare
           </h3>
-          <p className="mt-1 text-xs leading-5 text-zinc-500">
-            Här redigerar du användare som redan finns. E-post visas bara som
-            läsbar information.
+          <p className="mt-0.5 text-xs leading-5 text-zinc-500">
+            {users.length} registrerade · e-post är skrivskyddad
           </p>
         </div>
 
@@ -206,32 +199,38 @@ function UserCard({
   return (
     <form
       action={(formData) => onSave(user.id, formData)}
-      className="rounded-lg border border-zinc-200 bg-white p-4"
+      className="rounded-3xl border border-zinc-200/80 bg-white p-4 shadow-sm"
     >
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-base font-semibold text-zinc-900">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 pb-4">
+        <div className="min-w-0 flex-1">
+          <p className="break-words text-base font-bold text-zinc-900">
             {user.name}
           </p>
-          <p className="mt-0.5 truncate text-xs text-zinc-500">{user.email}</p>
+          <p className="mt-1 break-all text-sm text-zinc-500">{user.email}</p>
         </div>
-        <span className="rounded-full bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-700">
+        <span
+          className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+            user.role === "ADMIN"
+              ? "bg-violet-100 text-violet-700"
+              : "bg-blue-50 text-blue-700"
+          }`}
+        >
           {user.role === "ADMIN" ? "Admin" : "Personal"}
         </span>
       </div>
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-        <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-3">
-          <Field label="Namn" name="name" defaultValue={user.name} />
-          <ReadonlyField label="E-post" value={user.email} />
-          <RoleSelect
-            name="role"
-            defaultValue={user.role}
-            disabled={user.id === currentUserId}
-          />
-          <StoreSelect
-            stores={stores}
-            defaultValue={user.storeId ?? stores[0]?.id ?? ""}
-          />
+      <div className="flex flex-col gap-4">
+        <Field label="Namn" name="name" defaultValue={user.name} />
+        <ReadonlyField label="E-post" value={user.email} />
+        <RoleSelect
+          name="role"
+          defaultValue={user.role}
+          disabled={user.id === currentUserId}
+        />
+        <StoreSelect
+          stores={stores}
+          defaultValue={user.storeId ?? stores[0]?.id ?? ""}
+        />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <ReadonlyField label="Skapad" value={formatDate(user.createdAt)} />
           <ReadonlyField label="Butik nu" value={user.store?.name ?? "-"} />
         </div>
@@ -239,23 +238,12 @@ function UserCard({
         <button
           type="submit"
           disabled={isSaving}
-          className="min-h-11 cursor-pointer rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:shadow-none"
+          className="min-h-12 w-full cursor-pointer rounded-2xl bg-zinc-900 px-4 text-sm font-bold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
         >
           {isSaving ? "Sparar..." : "Spara ändringar"}
         </button>
       </div>
     </form>
-  );
-}
-
-function SummaryBox({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-lg border border-zinc-200 bg-white px-3 py-2">
-      <p className="text-xs font-medium text-zinc-400">{label}</p>
-      <p className="mt-0.5 truncate text-lg font-semibold text-zinc-900">
-        {value}
-      </p>
-    </div>
   );
 }
 
@@ -265,22 +253,26 @@ function Field({
   defaultValue,
   type = "text",
   autoComplete,
+  className = "",
 }: {
   label: string;
   name: string;
   defaultValue?: string;
   type?: string;
   autoComplete?: string;
+  className?: string;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+    <label
+      className={`flex flex-col gap-1.5 text-sm font-medium text-zinc-700 ${className}`}
+    >
       {label}
       <input
         name={name}
         type={type}
         defaultValue={defaultValue}
         autoComplete={autoComplete}
-        className="min-h-11 rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
+        className="min-h-12 w-full rounded-2xl border border-zinc-200 bg-white px-3.5 text-base font-normal text-zinc-900 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-500/10"
       />
     </label>
   );
@@ -288,9 +280,9 @@ function Field({
 
 function ReadonlyField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+    <div className="flex flex-col gap-1.5 text-sm font-medium text-zinc-700">
       {label}
-      <p className="flex min-h-11 items-center truncate rounded-lg bg-zinc-50 px-3 text-base font-normal text-zinc-600">
+      <p className="min-h-12 break-words rounded-2xl bg-zinc-50 px-3.5 py-3 text-base font-normal leading-6 text-zinc-600">
         {value}
       </p>
     </div>
@@ -309,13 +301,13 @@ function RoleSelect({
   return (
     <>
       {disabled ? <input type="hidden" name={name} value={defaultValue} /> : null}
-      <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-zinc-700">
         Roll
         <select
           name={disabled ? undefined : name}
           defaultValue={defaultValue}
           disabled={disabled}
-          className="min-h-11 cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:bg-zinc-100"
+          className="min-h-12 w-full cursor-pointer rounded-2xl border border-zinc-200 bg-white px-3.5 text-base font-normal text-zinc-900 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-500/10 disabled:cursor-not-allowed disabled:bg-zinc-100"
         >
           <option value="PERSONAL">Personal</option>
           <option value="ADMIN">Admin</option>
@@ -328,17 +320,21 @@ function RoleSelect({
 function StoreSelect({
   stores,
   defaultValue,
+  className = "",
 }: {
   stores: StoreOption[];
   defaultValue: string;
+  className?: string;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+    <label
+      className={`flex flex-col gap-1.5 text-sm font-medium text-zinc-700 ${className}`}
+    >
       Butik
       <select
         name="storeId"
         defaultValue={defaultValue}
-        className="min-h-11 cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
+        className="min-h-12 w-full cursor-pointer rounded-2xl border border-zinc-200 bg-white px-3.5 text-base font-normal text-zinc-900 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-500/10"
       >
         {stores.map((store) => (
           <option key={store.id} value={store.id}>

@@ -28,12 +28,25 @@ function createPrismaClient() {
 const prisma = createPrismaClient();
 
 async function main() {
+  const { DEFAULT_TEST_PICKUP_ADDRESS: exampleAddress } = await import(
+    "../src/lib/constants/pickup"
+  );
+  const exampleLogo =
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Generic_store_icon.svg/240px-Generic_store_icon.svg.png";
+
   const store = await prisma.store.upsert({
     where: { slug: "demo-butik" },
-    update: {},
+    update: {
+      address: exampleAddress,
+      logoUrl: exampleLogo,
+      thankYouMessage: "Tack för ditt köp – vi ses vid upphämtningsdisken!",
+    },
     create: {
       name: "Demo Butik",
       slug: "demo-butik",
+      address: exampleAddress,
+      logoUrl: exampleLogo,
+      thankYouMessage: "Tack för ditt köp – vi ses vid upphämtningsdisken!",
     },
   });
 
@@ -102,7 +115,7 @@ async function main() {
     },
   });
 
-  await prisma.productVariant.upsert({
+  const smallVariant = await prisma.productVariant.upsert({
     where: {
       productId_wooVariantId: {
         productId: variableProduct.id,
@@ -140,33 +153,98 @@ async function main() {
     },
   });
 
-  await prisma.pickup.upsert({
+  const { autoNotifyPickupReady } = await import(
+    "../src/lib/pickup-notifications"
+  );
+
+  const pickupOne = await prisma.pickup.upsert({
     where: {
       storeId_pickupCode: { storeId: store.id, pickupCode: "HAMTA-1001" },
     },
-    update: {},
+    update: {
+      customerEmail: "adiiinaaaa86@gmail.com",
+      status: PickupStatus.READY,
+      readyEmailSentAt: null,
+    },
     create: {
       storeId: store.id,
       customerName: "Sara Kund",
+      customerEmail: "adiiinaaaa86@gmail.com",
       pickupCode: "HAMTA-1001",
       status: PickupStatus.READY,
       notes: "Kontrollera legitimation vid utlämning.",
     },
   });
 
-  await prisma.pickup.upsert({
+  const pickupTwo = await prisma.pickup.upsert({
     where: {
       storeId_pickupCode: { storeId: store.id, pickupCode: "HAMTA-1002" },
     },
-    update: {},
+    update: {
+      customerEmail: "adiiinaaaa86@gmail.com",
+      status: PickupStatus.READY,
+      readyEmailSentAt: null,
+    },
     create: {
       storeId: store.id,
       customerName: "Ali Kund",
+      customerEmail: "adiiinaaaa86@gmail.com",
       pickupCode: "HAMTA-1002",
       status: PickupStatus.READY,
       notes: "Betald online.",
     },
   });
+
+  const importedWithImage = await prisma.product.findMany({
+    where: { storeId: store.id, imageUrl: { not: null } },
+    orderBy: { name: "asc" },
+    take: 2,
+    include: {
+      variants: { orderBy: { name: "asc" }, take: 1 },
+    },
+  });
+
+  const pickupProductOne = importedWithImage[0] ?? simpleProduct;
+  const pickupProductTwo = importedWithImage[1] ?? variableProduct;
+  const pickupVariantTwo =
+    importedWithImage[1]?.variants[0] ??
+    (await prisma.productVariant.findFirst({
+      where: { productId: pickupProductTwo.id },
+      orderBy: { name: "asc" },
+    })) ??
+    smallVariant;
+
+  await prisma.pickupItem.deleteMany({
+    where: { pickupId: { in: [pickupOne.id, pickupTwo.id] } },
+  });
+
+  await prisma.pickupItem.createMany({
+    data: [
+      {
+        pickupId: pickupOne.id,
+        productId: pickupProductOne.id,
+        productName: pickupProductOne.name,
+        productSlug: pickupProductOne.slug,
+        productImageUrl: pickupProductOne.imageUrl,
+        quantity: 1,
+      },
+      {
+        pickupId: pickupTwo.id,
+        productId: pickupProductTwo.id,
+        variantId: pickupVariantTwo.id,
+        productName: pickupProductTwo.name,
+        variantName: pickupVariantTwo.name,
+        productSlug: pickupProductTwo.slug,
+        productImageUrl: pickupVariantTwo.imageUrl ?? pickupProductTwo.imageUrl,
+        quantity: 2,
+      },
+    ],
+  });
+
+  const emailOne = await autoNotifyPickupReady(pickupOne.id);
+  const emailTwo = await autoNotifyPickupReady(pickupTwo.id);
+  console.log("- Mail HAMTA-1001:", emailOne.status, emailOne);
+  console.log("- Mail HAMTA-1002:", emailTwo.status, emailTwo);
 
   console.log("Seed klar!");
   console.log("- Butik:", store.name);

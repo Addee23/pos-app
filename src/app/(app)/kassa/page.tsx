@@ -3,7 +3,6 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import {
   KassaClient,
-  type PosProduct,
   type PosStore,
 } from "@/components/pos/KassaClient";
 
@@ -25,27 +24,19 @@ export default async function KassaPage() {
     );
   }
 
-  const [store, products] = await Promise.all([
-    prisma.store.findUnique({
-      where: { id: session.user.storeId },
-      select: {
-        id: true,
-        name: true,
-        address: true,
-        receiptFooter: true,
-        returnText: true,
-        thankYouMessage: true,
-        socialLinks: true,
-        receiptWidthMm: true,
-      },
-    }),
-    prisma.product.findMany({
-      where: { storeId: session.user.storeId },
-      include: { variants: { orderBy: { name: "asc" } } },
-      orderBy: { name: "asc" },
-      take: 50,
-    }),
-  ]);
+  const store = await prisma.store.findUnique({
+    where: { id: session.user.storeId },
+    select: {
+      id: true,
+      name: true,
+      address: true,
+      receiptFooter: true,
+      returnText: true,
+      thankYouMessage: true,
+      socialLinks: true,
+      receiptWidthMm: true,
+    },
+  });
 
   if (!store) {
     return (
@@ -58,24 +49,6 @@ export default async function KassaPage() {
     );
   }
 
-  const serializedProducts: PosProduct[] = products.map((product) => ({
-    id: product.id,
-    name: product.name,
-    ean: product.ean,
-    price: Number(product.price),
-    stockQuantity: product.stockQuantity,
-    stockLocation: product.stockLocation,
-    productType: product.productType,
-    variants: product.variants.map((variant) => ({
-      id: variant.id,
-      name: variant.name,
-      ean: variant.ean,
-      price: Number(variant.price),
-      stockQuantity: variant.stockQuantity,
-      stockLocation: variant.stockLocation,
-    })),
-  }));
-
   const serializedStore: PosStore = {
     id: store.id,
     name: store.name,
@@ -87,5 +60,10 @@ export default async function KassaPage() {
     receiptWidthMm: store.receiptWidthMm,
   };
 
-  return <KassaClient products={serializedProducts} store={serializedStore} />;
+  return (
+    <KassaClient
+      store={serializedStore}
+      isAdmin={session.user.role === "ADMIN"}
+    />
+  );
 }
