@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import {
+  forbidden,
+  tooManyRequests,
+  unauthorized,
+} from "@/lib/api-errors";
 import { prisma } from "@/lib/prisma";
 import { formatWooJsonForEditor, productToWooJson } from "@/lib/product-woo-json";
 import { isAdmin } from "@/lib/rbac";
+import { rateLimit } from "@/lib/rate-limit";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -11,15 +17,26 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: "Ej inloggad" }, { status: 401 });
+    return unauthorized();
   }
 
   if (!isAdmin(session.user.role)) {
-    return NextResponse.json({ error: "Åtkomst nekad" }, { status: 403 });
+    return forbidden();
+  }
+
+  const jsonLimit = rateLimit({
+    key: `product-woo-json:${session.user.id}`,
+    limit: 40,
+    windowMs: 60 * 1000,
+  });
+
+  if (!jsonLimit.allowed) {
+    return tooManyRequests(jsonLimit.retryAfterSeconds);
   }
 
   const { id } = await context.params;
 
+  try {
   const product = await prisma.product.findUnique({
     where: { id },
     include: {
@@ -42,4 +59,11 @@ export async function GET(_request: Request, context: RouteContext) {
     json: wooJson,
     jsonText: formatWooJsonForEditor(wooJson),
   });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json(
+      { error: "Kunde inte hämta produkt-JSON" },
+      { status: 500 },
+    );
+  }
 }

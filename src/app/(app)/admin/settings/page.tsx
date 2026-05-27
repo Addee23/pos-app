@@ -32,9 +32,9 @@ export default async function AdminSettingsPage({
   if (stores.length === 0) {
     return (
       <section className="rounded-3xl border border-dashed border-zinc-200 bg-white p-4">
-        <h2 className="text-lg font-semibold text-zinc-900">Settings</h2>
+        <h2 className="text-lg font-semibold text-zinc-900">Inställningar</h2>
         <p className="mt-2 text-sm text-zinc-500">
-          Ingen butik finns ännu. Skapa en butik innan settings kan sparas.
+          Ingen butik finns ännu. Skapa en butik innan inställningar kan sparas.
         </p>
       </section>
     );
@@ -78,9 +78,9 @@ export default async function AdminSettingsPage({
         <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
           Admin
         </p>
-        <h2 className="mt-1 text-xl font-semibold text-zinc-900">Settings</h2>
+        <h2 className="mt-1 text-xl font-semibold text-zinc-900">Inställningar</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-500">
-          Hantera butik, kvitto och WooCommerce-integration.
+          Butik, integration, kvitto och e-post.
         </p>
       </div>
 

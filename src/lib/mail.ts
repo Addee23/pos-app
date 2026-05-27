@@ -147,15 +147,37 @@ export async function sendPickupReadyEmail(
 }
 
 export async function sendTestEmail(config: SmtpConfig, recipient: string) {
-  const transporter = createMailTransporter(config);
-
-  await transporter.sendMail({
-    from: config.from,
-    to: recipient,
-    subject: "Testmail från POS & Lager",
-    text: "Det här är ett testmail. SMTP-inställningarna fungerar.",
-    html: "<p>Det här är ett <strong>testmail</strong>. SMTP-inställningarna fungerar.</p>",
-  });
+  // Även ett SMTP-test ska visa den riktiga kundupplevelsen:
+  // produkt, upphämtningskod, butiksadress och karta.
+  await sendPickupReadyEmail(
+    {
+      customerEmail: recipient,
+      customerName: "Testkund",
+      pickupCode: "TEST-ORDER",
+      notes:
+        "Det här är en förhandsvisning av mailet som skickas när en order är redo för upphämtning.",
+      store: {
+        name: "POS & Lager",
+        address: null,
+        logoUrl: null,
+        thankYouMessage: "Tack för ditt köp - vi ses i butiken!",
+        returnText: null,
+        receiptFooter: null,
+      },
+      items: [
+        {
+          productName: "Exempelprodukt",
+          variantName: "1 st",
+          quantity: 1,
+          productImageUrl:
+            "https://dummyimage.com/640x420/1a4d5c/ffffff.jpg?text=Produktbild",
+          productInfo:
+            "Här visas produktens metabeskrivning, korta beskrivning eller annan produktinformation.",
+        },
+      ],
+    },
+    config,
+  );
 }
 
 function toEmailSafeImageUrl(url: string | null | undefined): string | null {
@@ -164,7 +186,13 @@ function toEmailSafeImageUrl(url: string | null | undefined): string | null {
     return null;
   }
 
-  // Viktigt: vi använder en vanlig publik bildlänk, inte cid/attachment.
-  // Då ligger bilden i HTML-mailet och inte som en bilaga.
-  return trimmedUrl;
+  // Mailklienter är sämre än webbläsare på moderna bildformat som WebP.
+  // Därför gör vi produktbilder/kartor till JPG-länkar, men fortfarande som
+  // vanliga externa HTML-bilder, inte som bilagor eller cid.
+  const proxiedUrl = new URL("https://images.weserv.nl/");
+  proxiedUrl.searchParams.set("url", trimmedUrl);
+  proxiedUrl.searchParams.set("w", "640");
+  proxiedUrl.searchParams.set("output", "jpg");
+
+  return proxiedUrl.toString();
 }

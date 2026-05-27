@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type SearchProduct = {
   id: string;
   name: string;
   productType: "SIMPLE" | "VARIABLE";
   storeName: string;
+  category: string | null;
+  brand: string | null;
+  country: string | null;
   slug: string;
   permalink: string | null;
   price: number;
@@ -32,18 +35,42 @@ export type SearchProductVariant = {
 type ProductSearchPopupClientProps = {
   products: SearchProduct[];
   hasQuery: boolean;
+  /** Ändras vid ny sökning/filter så popup kan öppnas automatiskt. */
+  searchToken: string;
 };
 
 export function ProductSearchPopupClient({
   products,
   hasQuery,
+  searchToken,
 }: ProductSearchPopupClientProps) {
-  const [isOpen, setIsOpen] = useState(hasQuery && products.length > 0);
+  const [dismissedToken, setDismissedToken] = useState<string | null>(null);
+  const [isOpen, setIsOpen] = useState(
+    () => hasQuery && products.length > 0,
+  );
+
+  useEffect(() => {
+    if (!hasQuery) {
+      setIsOpen(false);
+      setDismissedToken(null);
+      return;
+    }
+
+    if (products.length > 0 && dismissedToken !== searchToken) {
+      setIsOpen(true);
+    }
+  }, [hasQuery, products.length, searchToken, dismissedToken]);
+
+  function handleClose() {
+    setIsOpen(false);
+    setDismissedToken(searchToken);
+  }
 
   if (!hasQuery) {
     return (
-      <p className="rounded-lg border border-dashed border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500">
-        Sök på namn, EAN, slug eller WooCommerce-länk för att visa produkter.
+      <p className="rounded-3xl border border-dashed border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500">
+        Sök eller välj filter (kategori, varumärke, land) för att visa
+        produkter.
       </p>
     );
   }
@@ -69,7 +96,7 @@ export function ProductSearchPopupClient({
       ) : null}
 
       {isOpen ? (
-        <SearchInfoPopup products={products} onClose={() => setIsOpen(false)} />
+        <SearchInfoPopup products={products} onClose={handleClose} />
       ) : null}
     </>
   );
@@ -170,13 +197,14 @@ function SearchInfoCard({
 
       <div className="mt-4 overflow-hidden rounded-2xl border border-[#dfd4c6]">
         <ProductFact label="Pris" value={`${formatPrice(selectedOption.price)} kr`} />
-        <ProductFact label="Lager" value={`${selectedOption.stockQuantity} st`} />
         <ProductFact label="EAN" value={selectedOption.ean ?? "-"} />
-        <ProductFact
-          label="Lagerplats"
-          value={selectedOption.stockLocation ?? "-"}
-        />
         <ProductFact label="Slug" value={product.slug} />
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {product.category ? <TaxonomyChip label={product.category} /> : null}
+        {product.brand ? <TaxonomyChip label={product.brand} /> : null}
+        {product.country ? <TaxonomyChip label={product.country} /> : null}
       </div>
 
       <button
@@ -260,12 +288,18 @@ function ProductImageLarge({
 
 function ProductFact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-[#dfd4c6] bg-[#f3eee5] px-3 py-2 text-xs last:border-b-0">
-      <p className="font-bold text-[#6a5b50]">{label}</p>
-      <p className="max-w-40 break-words text-right font-bold text-blue-700">
-        {value}
-      </p>
+    <div className="grid grid-cols-[auto_1fr] gap-3 border-b border-[#dfd4c6] bg-[#f3eee5] px-3 py-2.5 text-xs last:border-b-0">
+      <p className="shrink-0 font-bold text-[#6a5b50]">{label}</p>
+      <p className="break-words text-right font-bold text-blue-700">{value}</p>
     </div>
+  );
+}
+
+function TaxonomyChip({ label }: { label: string }) {
+  return (
+    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#75675d]">
+      {label}
+    </span>
   );
 }
 

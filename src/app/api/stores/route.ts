@@ -10,6 +10,21 @@ export async function GET() {
     return NextResponse.json({ error: "Ej inloggad" }, { status: 401 });
   }
 
+  const listLimit = rateLimit({
+    key: `store-list:${session.user.id}`,
+    limit: 60,
+    windowMs: 60 * 1000,
+  });
+
+  if (!listLimit.allowed) {
+    return NextResponse.json(
+      {
+        error: `För många förfrågningar. Vänta ${listLimit.retryAfterSeconds} sekunder.`,
+      },
+      { status: 429 },
+    );
+  }
+
   const stores = await prisma.store.findMany({
     orderBy: { name: "asc" },
     select: { id: true, name: true, slug: true },

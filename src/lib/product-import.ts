@@ -1,6 +1,16 @@
 import type { PrismaClient } from "@/generated/prisma/client";
-import { decryptSecret } from "@/lib/secret-crypto";
+import {
+  canLoadWooVariations,
+  fetchAllWooProducts,
+  fetchLatestWooProducts,
+  hasWooCredentials,
+  loadWooVariations,
+  type StoreWooCredentials,
+} from "@/lib/woocommerce-api";
 import { normalizeWooProducts } from "@/lib/woocommerce-products";
+
+export { fetchAllWooProducts, fetchLatestWooProducts, hasWooCredentials };
+export type { StoreWooCredentials };
 
 export type ImportProductsResult = {
   importedProducts: number;
@@ -9,11 +19,8 @@ export type ImportProductsResult = {
   updateOnly: boolean;
 };
 
-type StoreForImport = {
+type StoreForImport = StoreWooCredentials & {
   id: string;
-  wooUrl: string | null;
-  wooConsumerKey: string | null;
-  wooConsumerSecret: string | null;
 };
 
 export async function importWooProductsForStore(
@@ -137,31 +144,4 @@ export async function importWooProductsForStore(
     skippedProducts,
     updateOnly,
   };
-}
-
-function canLoadWooVariations(store: StoreForImport) {
-  return Boolean(store.wooUrl && store.wooConsumerKey && store.wooConsumerSecret);
-}
-
-async function loadWooVariations(
-  store: StoreForImport,
-  productId: number,
-): Promise<unknown[]> {
-  const wooUrl = store.wooUrl?.replace(/\/$/, "");
-  if (!wooUrl || !store.wooConsumerKey || !store.wooConsumerSecret) {
-    return [];
-  }
-
-  const url = new URL(`${wooUrl}/wp-json/wc/v3/products/${productId}/variations`);
-  url.searchParams.set("per_page", "100");
-  url.searchParams.set("consumer_key", decryptSecret(store.wooConsumerKey));
-  url.searchParams.set("consumer_secret", decryptSecret(store.wooConsumerSecret));
-
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
-    return [];
-  }
-
-  const data = await response.json();
-  return Array.isArray(data) ? data : [];
 }

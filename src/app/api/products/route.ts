@@ -23,6 +23,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Åtkomst nekad" }, { status: 403 });
   }
 
+  const listLimit = rateLimit({
+    key: `product-list:${session.user.id}`,
+    limit: 60,
+    windowMs: 60 * 1000,
+  });
+
+  if (!listLimit.allowed) {
+    return NextResponse.json(
+      {
+        error: `För många förfrågningar. Vänta ${listLimit.retryAfterSeconds} sekunder.`,
+      },
+      { status: 429 },
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const parsed = productSearchSchema.safeParse({
     q: searchParams.get("q") ?? undefined,

@@ -31,6 +31,7 @@ export function AppHeader({ title, subtitle, userName, role }: AppHeaderProps) {
         <ProfileMenu
           userName={userName}
           roleLabel={role === "ADMIN" ? "Admin" : "Personal"}
+          role={role}
         />
       </div>
     </header>

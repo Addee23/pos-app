@@ -60,5 +60,10 @@ export default async function KassaPage() {
     receiptWidthMm: store.receiptWidthMm,
   };
 
-  return <KassaClient store={serializedStore} />;
+  return (
+    <KassaClient
+      store={serializedStore}
+      isAdmin={session.user.role === "ADMIN"}
+    />
+  );
 }

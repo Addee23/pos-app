@@ -4,14 +4,17 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { Role } from "@/generated/prisma/client";
-import { getNavItems, type NavItem } from "@/components/layout/navItems";
+import {
+  getAdminMenuNavItems,
+  getAdminPrimaryNavItems,
+  getNavItems,
+  type NavItem,
+} from "@/components/layout/navItems";
 
 type AppNavProps = {
   role: Role;
   variant: "desktop" | "mobile";
 };
-
-const visibleAdminItems = 4;
 
 export function AppNav({ role, variant }: AppNavProps) {
   const pathname = usePathname();
@@ -19,8 +22,8 @@ export function AppNav({ role, variant }: AppNavProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const items = getNavItems(role);
   const primaryMobileItems =
-    role === "ADMIN" ? items.slice(0, visibleAdminItems) : items;
-  const menuMobileItems = role === "ADMIN" ? items.slice(visibleAdminItems) : [];
+    role === "ADMIN" ? getAdminPrimaryNavItems() : items;
+  const menuMobileItems = role === "ADMIN" ? getAdminMenuNavItems() : [];
   const mobileItems =
     role === "ADMIN"
       ? [

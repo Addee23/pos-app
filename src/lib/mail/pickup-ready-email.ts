@@ -136,8 +136,10 @@ export function buildPickupReadyHtml(
     )
     .join("");
 
-  const logoBlock = pickup.store.logoUrl
-    ? `<img src="${escapeHtml(pickup.store.logoUrl)}" alt="${escapeHtml(pickup.store.name)}" width="160" style="display:block;max-width:160px;max-height:72px;width:auto;height:auto;margin:0 auto;" />`
+  const logoUrl = pickup.store.logoUrl?.trim() ?? "";
+  const canRenderLogo = logoUrl && !logoUrl.toLowerCase().includes(".svg");
+  const logoBlock = canRenderLogo
+    ? `<img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(pickup.store.name)}" width="160" style="display:block;max-width:160px;max-height:72px;width:auto;height:auto;margin:0 auto;" />`
     : `<p style="margin:0;font-size:20px;font-weight:800;color:#ffffff;letter-spacing:0.02em;">${escapeHtml(pickup.store.name)}</p>`;
 
   const mapSection = address
@@ -167,6 +169,13 @@ export function buildPickupReadyHtml(
               ? `<a href="${escapeHtml(mapsUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:${t.primary};color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 18px;border-radius:10px;">
                   ${escapeHtml(PICKUP_EMAIL_COPY.mapButton)}
                 </a>`
+              : ""
+          }
+          ${
+            mapImageSrc && mapsUrl
+              ? `<p style="margin:12px 0 0;font-size:12px;line-height:1.45;color:${t.muted};">
+                  Om kartbilden inte visas i mailprogrammet kan du öppna platsen via knappen ovan.
+                </p>`
               : ""
           }
         </td>

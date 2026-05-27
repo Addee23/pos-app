@@ -127,10 +127,6 @@ export function ProductEditForm({ product }: ProductEditFormProps) {
         </div>
 
         <div className="mt-4 border-t border-zinc-100 pt-4">
-          <h3 className="text-sm font-semibold text-zinc-900">Klassificering</h3>
-          <p className="mt-1 text-xs text-zinc-500">
-            Kategori, varumärke och ursprungsland styr filter i produktlistan.
-          </p>
           <div className="mt-3">
             <TaxonomyFields
               category={product.category}

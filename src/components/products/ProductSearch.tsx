@@ -2,10 +2,12 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  useEffect,
   useRef,
   useState,
   useTransition,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
 import type { ProductFilterOptions } from "@/lib/product-filters";
 
@@ -14,9 +16,20 @@ type StoreOption = {
   name: string;
 };
 
+type DraftFilters = {
+  category: string;
+  brand: string;
+  country: string;
+  storeId: string;
+};
+
 type ProductSearchProps = {
   stores: StoreOption[];
   filterOptions: ProductFilterOptions;
+  basePath?: string;
+  showStoreFilter?: boolean;
+  /** Sök-sidan: filter appliceras först vid klick på Sök. */
+  submitOnButtonOnly?: boolean;
   initialQuery?: string;
   initialStoreId?: string;
   initialCategory?: string;
@@ -33,6 +46,9 @@ type ActiveFilter = {
 export function ProductSearch({
   stores,
   filterOptions,
+  basePath = "/admin/products",
+  showStoreFilter = true,
+  submitOnButtonOnly = false,
   initialQuery = "",
   initialStoreId = "",
   initialCategory = "",
@@ -46,28 +62,54 @@ export function ProductSearch({
     initialQuery,
     value: initialQuery,
   });
+  const [draft, setDraft] = useState<DraftFilters>({
+    category: initialCategory,
+    brand: initialBrand,
+    country: initialCountry,
+    storeId: initialStoreId,
+  });
   const [filtersOpen, setFiltersOpen] = useState(
-    Boolean(initialBrand || initialCountry || initialStoreId),
+    Boolean(initialBrand || initialCountry || initialStoreId || initialCategory),
   );
   const inputRef = useRef<HTMLInputElement>(null);
   const query =
     queryState.initialQuery === initialQuery ? queryState.value : initialQuery;
 
+  useEffect(() => {
+    setDraft({
+      category: initialCategory,
+      brand: initialBrand,
+      country: initialCountry,
+      storeId: initialStoreId,
+    });
+  }, [initialCategory, initialBrand, initialCountry, initialStoreId]);
+
   function setQuery(value: string) {
     setQueryState({ initialQuery, value });
   }
 
+  const chipFilters = submitOnButtonOnly ? draft : appliedFilters();
   const activeFilters = buildActiveFilters({
+    q: initialQuery,
+    category: initialCategory,
     brand: initialBrand,
+    country: initialCountry,
     storeId: initialStoreId,
     stores,
   });
+  const draftFilterCount = submitOnButtonOnly
+    ? countDraftFilters(draft, query, initialQuery)
+    : activeFilters.length;
+  const hasAppliedFilters = activeFilters.length > 0;
 
-  const secondaryFilterCount = [initialBrand, initialStoreId].filter(Boolean).length;
-
-  const hasAnyFilter = Boolean(
-    initialQuery || initialCategory || initialBrand || initialCountry || initialStoreId,
-  );
+  function appliedFilters(): DraftFilters {
+    return {
+      category: initialCategory,
+      brand: initialBrand,
+      country: initialCountry,
+      storeId: initialStoreId,
+    };
+  }
 
   function navigate(updates: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -84,23 +126,53 @@ export function ProductSearch({
 
     startTransition(() => {
       const queryString = params.toString();
-      router.push(queryString ? `/admin/products?${queryString}` : "/admin/products");
+      router.push(queryString ? `${basePath}?${queryString}` : basePath);
     });
   }
 
-  function toggleCategory(category: string) {
-    navigate({
-      category: initialCategory === category ? null : category,
+  function submitAll() {
+    const params = new URLSearchParams();
+    const trimmed = query.trim();
+
+    if (trimmed) {
+      params.set("q", trimmed);
+    }
+    if (draft.category) {
+      params.set("category", draft.category);
+    }
+    if (draft.brand) {
+      params.set("brand", draft.brand);
+    }
+    if (draft.country) {
+      params.set("country", draft.country);
+    }
+    if (draft.storeId) {
+      params.set("storeId", draft.storeId);
+    }
+
+    startTransition(() => {
+      const queryString = params.toString();
+      router.push(queryString ? `${basePath}?${queryString}` : basePath);
     });
   }
 
-  function toggleCountry(country: string) {
-    navigate({
-      country: initialCountry === country ? null : country,
-    });
+  function toggleDraft(key: keyof DraftFilters, value: string) {
+    setDraft((current) => ({
+      ...current,
+      [key]: current[key] === value ? "" : value,
+    }));
+  }
+
+  function toggleParam(key: string, value: string, current: string) {
+    navigate({ [key]: current === value ? null : value });
   }
 
   function handleSearch() {
+    if (submitOnButtonOnly) {
+      submitAll();
+      return;
+    }
+
     const trimmed = query.trim();
     if (trimmed === initialQuery) {
       return;
@@ -118,6 +190,14 @@ export function ProductSearch({
     if (event.key === "Escape") {
       setQuery("");
       inputRef.current?.blur();
+      if (submitOnButtonOnly) {
+        setDraft({ category: "", brand: "", country: "", storeId: "" });
+        if (hasAppliedFilters || initialQuery) {
+          startTransition(() => router.push(basePath));
+        }
+        return;
+      }
+
       if (initialQuery) {
         navigate({ q: null });
       }
@@ -126,14 +206,41 @@ export function ProductSearch({
 
   function clearAll() {
     setQuery("");
+    setDraft({ category: "", brand: "", country: "", storeId: "" });
     setFiltersOpen(false);
     startTransition(() => {
-      router.push("/admin/products");
+      router.push(basePath);
     });
   }
 
+  function clearAppliedFilter(key: string) {
+    if (submitOnButtonOnly) {
+      const next = { ...draft };
+      if (key === "q") {
+        setQuery("");
+      } else {
+        next[key as keyof DraftFilters] = "";
+        setDraft(next);
+      }
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete(key);
+      params.delete("page");
+      const trimmed = key === "q" ? "" : query.trim();
+      if (trimmed && key !== "q") {
+        params.set("q", trimmed);
+      }
+      startTransition(() => {
+        const qs = params.toString();
+        router.push(qs ? `${basePath}?${qs}` : basePath);
+      });
+      return;
+    }
+
+    navigate({ [key]: null });
+  }
+
   return (
-    <section className="relative sticky top-[73px] z-30 space-y-2.5 rounded-2xl border border-zinc-200/70 bg-white/90 p-2.5 shadow-sm backdrop-blur-md">
+    <section className="relative sticky top-[73px] z-30 space-y-3 rounded-2xl border border-zinc-200/70 bg-white/95 p-3 shadow-sm backdrop-blur-md">
       <div className="flex items-center gap-2">
         <label className="group relative min-w-0 flex-1">
           <span className="sr-only">Sök produkter</span>
@@ -146,19 +253,14 @@ export function ProductSearch({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleSearchKeyDown}
-            placeholder="Sök produkter…"
-            className="h-10 w-full rounded-xl bg-zinc-100/80 py-2 pl-10 pr-9 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:bg-white focus:ring-2 focus:ring-zinc-200/80"
+            placeholder="Namn, EAN, slug eller länk…"
+            className="h-11 w-full rounded-xl bg-zinc-100/80 py-2 pl-10 pr-9 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:bg-white focus:ring-2 focus:ring-zinc-200/80"
           />
           {query ? (
             <button
               type="button"
-              onClick={() => {
-                setQuery("");
-                if (initialQuery) {
-                  navigate({ q: null });
-                }
-              }}
-              aria-label="Rensa sökning"
+              onClick={() => setQuery("")}
+              aria-label="Rensa sökfält"
               className="absolute right-2.5 top-1/2 flex size-5 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-zinc-400 transition hover:bg-zinc-200/60 hover:text-zinc-600"
             >
               <CloseIcon />
@@ -168,88 +270,137 @@ export function ProductSearch({
 
         <button
           type="button"
+          onClick={handleSearch}
+          disabled={pending}
+          className="h-11 shrink-0 cursor-pointer rounded-xl bg-zinc-900 px-4 text-xs font-bold text-white transition hover:bg-zinc-800 disabled:opacity-50"
+        >
+          Sök
+        </button>
+
+        <button
+          type="button"
           onClick={() => setFiltersOpen((open) => !open)}
           aria-expanded={filtersOpen}
-          aria-label="Visa fler filter"
-          className={`relative flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-xl transition ${
-            filtersOpen || secondaryFilterCount > 0
+          aria-label="Filter"
+          className={`relative flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl transition ${
+            filtersOpen || draftFilterCount > 0
               ? "bg-zinc-900 text-white"
               : "bg-zinc-100/80 text-zinc-500 hover:bg-zinc-200/80 hover:text-zinc-700"
           }`}
         >
           <SlidersIcon />
-          {secondaryFilterCount > 0 ? (
-            <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
-              {secondaryFilterCount}
+          {draftFilterCount > 0 ? (
+            <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white">
+              {draftFilterCount}
             </span>
           ) : null}
         </button>
       </div>
 
-      {filterOptions.categories.length > 0 ? (
-        <div className="-mx-0.5 flex gap-1.5 overflow-x-auto px-0.5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {filterOptions.categories.map((category) => {
-            const selected = initialCategory === category;
+      {submitOnButtonOnly ? (
+        <p className="text-[11px] text-zinc-500">
+          Välj filter och tryck <span className="font-semibold">Sök</span> för att
+          visa produkter.
+        </p>
+      ) : null}
 
-            return (
-              <FilterChip
-                key={category}
-                label={category}
-                selected={selected}
-                pending={pending}
-                onClick={() => toggleCategory(category)}
-              />
-            );
-          })}
-        </div>
+      {filterOptions.categories.length > 0 ? (
+        <FilterRow label="Kategori">
+          {filterOptions.categories.map((category) => (
+            <FilterChip
+              key={category}
+              label={category}
+              selected={chipFilters.category === category}
+              pending={pending}
+              onClick={() =>
+                submitOnButtonOnly
+                  ? toggleDraft("category", category)
+                  : toggleParam("category", category, initialCategory)
+              }
+            />
+          ))}
+        </FilterRow>
+      ) : null}
+
+      {filterOptions.brands.length > 0 ? (
+        <FilterRow label="Varumärke">
+          {filterOptions.brands.map((brand) => (
+            <FilterChip
+              key={brand}
+              label={brand}
+              selected={chipFilters.brand === brand}
+              pending={pending}
+              onClick={() =>
+                submitOnButtonOnly
+                  ? toggleDraft("brand", brand)
+                  : toggleParam("brand", brand, initialBrand)
+              }
+              accent="violet"
+            />
+          ))}
+        </FilterRow>
       ) : null}
 
       {filterOptions.countries.length > 0 ? (
-        <div className="-mx-0.5 flex gap-1.5 overflow-x-auto px-0.5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {filterOptions.countries.map((country) => {
-            const selected = initialCountry === country;
+        <FilterRow label="Land">
+          {filterOptions.countries.map((country) => (
+            <FilterChip
+              key={country}
+              label={country}
+              selected={chipFilters.country === country}
+              pending={pending}
+              onClick={() =>
+                submitOnButtonOnly
+                  ? toggleDraft("country", country)
+                  : toggleParam("country", country, initialCountry)
+              }
+              accent="blue"
+            />
+          ))}
+        </FilterRow>
+      ) : null}
 
-            return (
+      {filtersOpen && showStoreFilter && stores.length > 0 ? (
+        <div className="rounded-xl border border-zinc-100 bg-zinc-50/80 p-3">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-zinc-400">
+            Butik
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <FilterChip
+              label="Alla butiker"
+              selected={!chipFilters.storeId}
+              pending={pending}
+              onClick={() =>
+                submitOnButtonOnly
+                  ? setDraft((current) => ({ ...current, storeId: "" }))
+                  : navigate({ storeId: null })
+              }
+            />
+            {stores.map((store) => (
               <FilterChip
-                key={country}
-                label={country}
-                selected={selected}
+                key={store.id}
+                label={store.name}
+                selected={chipFilters.storeId === store.id}
                 pending={pending}
-                onClick={() => toggleCountry(country)}
-                muted
+                onClick={() =>
+                  submitOnButtonOnly
+                    ? toggleDraft("storeId", store.id)
+                    : toggleParam("storeId", store.id, initialStoreId)
+                }
               />
-            );
-          })}
+            ))}
+          </div>
         </div>
       ) : null}
 
-      {filtersOpen ? (
-        <div className="grid grid-cols-1 gap-2 border-t border-zinc-100 pt-2.5 sm:grid-cols-2">
-          <CompactSelect
-            label="Varumärke"
-            value={initialBrand}
-            onChange={(value) => navigate({ brand: value || null })}
-            options={filterOptions.brands}
-          />
-          <CompactSelect
-            label="Butik"
-            value={initialStoreId}
-            onChange={(value) => navigate({ storeId: value || null })}
-            options={stores.map((store) => store.name)}
-            optionValues={stores.map((store) => store.id)}
-            emptyLabel="Alla butiker"
-          />
-        </div>
-      ) : null}
-
-      {hasAnyFilter ? (
+      {hasAppliedFilters ? (
         <div className="flex flex-wrap items-center gap-1.5 border-t border-zinc-100 pt-2">
           {activeFilters.map((filter) => (
             <button
-              key={filter.key}
+              key={`${filter.key}-${filter.value}`}
               type="button"
               disabled={pending}
-              onClick={() => navigate({ [filter.key]: null })}
+              onClick={() => clearAppliedFilter(filter.key)}
               className="inline-flex max-w-full cursor-pointer items-center gap-1 rounded-full bg-zinc-100/90 py-1 pl-2.5 pr-1.5 text-[11px] font-medium text-zinc-600 transition hover:bg-zinc-200/80 disabled:opacity-60"
             >
               <span className="truncate">{filter.label}</span>
@@ -279,69 +430,85 @@ export function ProductSearch({
   );
 }
 
-function CompactSelect({
+function countDraftFilters(
+  draft: DraftFilters,
+  query: string,
+  appliedQuery: string,
+): number {
+  let count = 0;
+  if (draft.category) {
+    count += 1;
+  }
+  if (draft.brand) {
+    count += 1;
+  }
+  if (draft.country) {
+    count += 1;
+  }
+  if (draft.storeId) {
+    count += 1;
+  }
+  if (query.trim() && query.trim() !== appliedQuery) {
+    count += 1;
+  }
+  return count;
+}
+
+function FilterRow({
   label,
-  value,
-  onChange,
-  options,
-  optionValues,
-  emptyLabel = "Alla",
+  children,
 }: {
   label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: string[];
-  optionValues?: string[];
-  emptyLabel?: string;
+  children: ReactNode;
 }) {
-  if (options.length === 0 && !value) {
-    return null;
-  }
-
   return (
-    <label className="flex min-w-0 flex-col gap-1">
-      <span className="px-0.5 text-[10px] font-medium text-zinc-400">{label}</span>
-      <div className="relative">
-        <select
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="h-9 w-full min-w-0 cursor-pointer appearance-none rounded-lg bg-zinc-100/80 py-1.5 pl-2.5 pr-8 text-xs font-medium text-zinc-800 outline-none transition focus:bg-white focus:ring-2 focus:ring-zinc-200/80"
-        >
-          <option value="">{emptyLabel}</option>
-          {options.map((option, index) => (
-            <option
-              key={optionValues?.[index] ?? option}
-              value={optionValues?.[index] ?? option}
-            >
-              {option}
-            </option>
-          ))}
-        </select>
-        <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400">
-          <ChevronDownIcon />
-        </span>
+    <div>
+      <p className="mb-1.5 px-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400">
+        {label}
+      </p>
+      <div className="-mx-0.5 flex gap-1.5 overflow-x-auto px-0.5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {children}
       </div>
-    </label>
+    </div>
   );
 }
 
 function buildActiveFilters({
+  q,
+  category,
   brand,
+  country,
   storeId,
   stores,
 }: {
+  q: string;
+  category: string;
   brand: string;
+  country: string;
   storeId: string;
   stores: StoreOption[];
 }): ActiveFilter[] {
   const filters: ActiveFilter[] = [];
 
+  if (q) {
+    filters.push({ key: "q", value: q, label: `“${q}”` });
+  }
+
+  if (category) {
+    filters.push({ key: "category", value: category, label: category });
+  }
+
   if (brand) {
     filters.push({ key: "brand", value: brand, label: brand });
   }
 
+  if (country) {
+    filters.push({ key: "country", value: country, label: country });
+  }
+
   if (storeId) {
-    const storeName = stores.find((store) => store.id === storeId)?.name ?? "Butik";
+    const storeName =
+      stores.find((store) => store.id === storeId)?.name ?? "Butik";
     filters.push({ key: "storeId", value: storeId, label: storeName });
   }
 
@@ -353,14 +520,20 @@ function FilterChip({
   selected,
   pending,
   onClick,
-  muted = false,
+  accent = "dark",
 }: {
   label: string;
   selected: boolean;
   pending: boolean;
   onClick: () => void;
-  muted?: boolean;
+  accent?: "dark" | "violet" | "blue";
 }) {
+  const selectedStyles = {
+    dark: "bg-zinc-900 text-white shadow-sm",
+    violet: "bg-violet-600 text-white shadow-sm",
+    blue: "bg-blue-600 text-white shadow-sm",
+  };
+
   return (
     <button
       type="button"
@@ -368,9 +541,7 @@ function FilterChip({
       onClick={onClick}
       className={`shrink-0 cursor-pointer rounded-full px-3 py-1.5 text-xs font-medium transition disabled:opacity-60 ${
         selected
-          ? muted
-            ? "bg-blue-600 text-white shadow-sm"
-            : "bg-zinc-900 text-white shadow-sm"
+          ? selectedStyles[accent]
           : "bg-zinc-100/90 text-zinc-600 hover:bg-zinc-200/80 hover:text-zinc-800"
       }`}
     >
@@ -415,23 +586,6 @@ function SlidersIcon() {
       <circle cx="7" cy="6" r="2" fill="currentColor" stroke="none" />
       <circle cx="15" cy="12" r="2" fill="currentColor" stroke="none" />
       <circle cx="11" cy="18" r="2" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function ChevronDownIcon() {
-  return (
-    <svg
-      className="size-3.5"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="m6 9 6 6 6-6" />
     </svg>
   );
 }

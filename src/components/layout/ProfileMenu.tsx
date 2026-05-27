@@ -6,9 +6,10 @@ import { useState } from "react";
 type ProfileMenuProps = {
   userName?: string | null;
   roleLabel: string;
+  role: "ADMIN" | "PERSONAL";
 };
 
-export function ProfileMenu({ userName, roleLabel }: ProfileMenuProps) {
+export function ProfileMenu({ userName, roleLabel, role }: ProfileMenuProps) {
   const [open, setOpen] = useState(false);
   const [passwordFormOpen, setPasswordFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -83,17 +84,19 @@ export function ProfileMenu({ userName, roleLabel }: ProfileMenuProps) {
 
           {!passwordFormOpen ? (
             <div className="mt-4 flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setPasswordFormOpen(true);
-                  setError(null);
-                  setSuccess(null);
-                }}
-                className="min-h-11 w-full cursor-pointer rounded-2xl bg-blue-50 px-4 text-left text-sm font-bold text-blue-700 transition hover:bg-blue-100"
-              >
-                Byt lösenord
-              </button>
+              {role === "PERSONAL" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPasswordFormOpen(true);
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                  className="min-h-11 w-full cursor-pointer rounded-2xl bg-blue-50 px-4 text-left text-sm font-bold text-blue-700 transition hover:bg-blue-100"
+                >
+                  Byt lösenord
+                </button>
+              ) : null}
 
               <button
                 type="button"

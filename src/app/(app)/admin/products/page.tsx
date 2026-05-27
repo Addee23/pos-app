@@ -98,13 +98,6 @@ export default async function AdminProductsPage({
       <ProductUpdateTools
         stores={stores}
         defaultStoreId={storeId ?? defaultStoreId}
-        products={products.map((product) => ({
-          id: product.id,
-          name: product.name,
-          wooProductId: product.wooProductId,
-          storeId: product.storeId,
-          storeName: product.store.name,
-        }))}
       />
       <ProductList products={products} />
       <ProductPagination
@@ -141,12 +134,6 @@ function ProductsHeader({
             Hantera sortiment, lager och priser.
           </p>
         </div>
-        <Link
-          href="/admin/products/new"
-          className="inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-accent px-4 text-sm font-bold text-accent-foreground shadow-sm transition hover:bg-blue-600"
-        >
-          + Lägg till produkt
-        </Link>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
         <SummaryBox label="Totalt produkter" value={String(productCount)} />

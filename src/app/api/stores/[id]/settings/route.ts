@@ -83,7 +83,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   } catch (error) {
     console.error(error);
     return NextResponse.json(
-      { error: "Kunde inte spara settings" },
+      { error: "Kunde inte spara inställningar" },
       { status: 500 },
     );
   }

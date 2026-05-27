@@ -4,15 +4,27 @@ import type {
   ProductVariant,
   Store,
 } from "@/generated/prisma/client";
+import { Suspense } from "react";
 import { auth } from "@/auth";
 import {
   ProductSearchPopupClient,
   type SearchProduct,
 } from "@/components/search/ProductSearchPopupClient";
+import { ProductSearch } from "@/components/products/ProductSearch";
 import { prisma } from "@/lib/prisma";
+import {
+  buildProductTaxonomyWhere,
+  loadProductFilterOptions,
+} from "@/lib/product-filters";
 
 type SökPageProps = {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    category?: string;
+    brand?: string;
+    country?: string;
+    storeId?: string;
+  }>;
 };
 
 type ProductSearchResult = Product & {
@@ -30,22 +42,46 @@ type NormalizedSearch = {
 
 export default async function SökPage({ searchParams }: SökPageProps) {
   const session = await auth();
-  const { q } = await searchParams;
+  const { q, category, brand, country, storeId } = await searchParams;
   const query = (q ?? "").trim();
   const search = normalizeSearch(query);
+  const isAdmin = session?.user.role === "ADMIN";
 
-  // Personal ska bara se sin egen butik. Admin kan söka i alla butiker.
   const storeFilter: Prisma.ProductWhereInput =
     session?.user.role === "PERSONAL" && session.user.storeId
       ? { storeId: session.user.storeId }
-      : {};
+      : storeId
+        ? { storeId }
+        : {};
 
-  const products =
-    search
-      ? await prisma.product.findMany({
+  const taxonomyFilter = buildProductTaxonomyWhere({
+    category: category?.trim(),
+    brand: brand?.trim(),
+    country: country?.trim(),
+  });
+
+  const textFilter = search ? buildProductSearchWhere(search) : {};
+
+  const hasFilters = Boolean(
+    query || category || brand || country || storeId,
+  );
+
+  const filterStoreId =
+    session?.user.role === "PERSONAL"
+      ? (session.user.storeId ?? undefined)
+      : (storeId ?? undefined);
+
+  const searchToken = [query, category ?? "", brand ?? "", country ?? "", storeId ?? ""]
+    .join("|")
+    .trim();
+
+  const [products, stores, filterOptions] = await Promise.all([
+    hasFilters
+      ? prisma.product.findMany({
           where: {
             ...storeFilter,
-            ...buildProductSearchWhere(search),
+            ...taxonomyFilter,
+            ...textFilter,
           },
           include: {
             store: { select: { id: true, name: true } },
@@ -54,15 +90,39 @@ export default async function SökPage({ searchParams }: SökPageProps) {
           orderBy: { name: "asc" },
           take: 30,
         })
-      : [];
+      : Promise.resolve([]),
+    isAdmin
+      ? prisma.store.findMany({
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+    loadProductFilterOptions(filterStoreId),
+  ]);
 
   return (
     <section className="flex flex-col gap-4">
       <SearchHeader productCount={products.length} query={query} />
-      <SearchForm query={query} />
+
+      <Suspense>
+        <ProductSearch
+          basePath="/sok"
+          submitOnButtonOnly
+          showStoreFilter={isAdmin}
+          stores={stores}
+          filterOptions={filterOptions}
+          initialQuery={query}
+          initialStoreId={storeId ?? ""}
+          initialCategory={category ?? ""}
+          initialBrand={brand ?? ""}
+          initialCountry={country ?? ""}
+        />
+      </Suspense>
+
       <ProductSearchPopupClient
         products={serializeSearchProducts(products)}
-        hasQuery={query.length > 0}
+        hasQuery={hasFilters}
+        searchToken={searchToken || "_"}
       />
     </section>
   );
@@ -76,49 +136,23 @@ function SearchHeader({
   query: string;
 }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
+    <div className="rounded-3xl border border-zinc-200/80 bg-white p-4 shadow-sm">
+      <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">
         Produktsök
       </p>
-      <h2 className="mt-1 text-xl font-semibold text-zinc-900">
-        Sök produkter
-      </h2>
+      <h2 className="mt-1 text-xl font-bold text-zinc-950">Sök produkter</h2>
       <p className="mt-2 text-sm leading-6 text-zinc-500">
-        Sök på namn, EAN, slug eller klistra in en WooCommerce/QR-länk.
+        Skriv sökord och/eller välj filter, tryck sedan Sök för att visa
+        produkter.
       </p>
       <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
         <SummaryBox label="Träffar" value={String(productCount)} />
-        <SummaryBox label="Sökning" value={query || "Senaste"} />
+        <SummaryBox
+          label="Sökning"
+          value={query || "Välj filter eller sök"}
+        />
       </div>
     </div>
-  );
-}
-
-function SearchForm({ query }: { query: string }) {
-  return (
-    <form
-      action="/sok"
-      className="sticky top-[73px] z-30 rounded-lg border border-zinc-200 bg-white/95 p-3 shadow-sm backdrop-blur"
-    >
-      <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
-        Sök produkt
-        <input
-          name="q"
-          type="search"
-          defaultValue={query}
-          placeholder="Namn, EAN, slug eller QR-länk"
-          autoComplete="off"
-          className="min-h-12 w-full cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
-        />
-      </label>
-
-      <button
-        type="submit"
-        className="mt-3 min-h-12 w-full cursor-pointer rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600"
-      >
-        Sök
-      </button>
-    </form>
   );
 }
 
@@ -130,6 +164,9 @@ function serializeSearchProducts(
     name: product.name,
     productType: product.productType as SearchProduct["productType"],
     storeName: product.store.name,
+    category: product.category,
+    brand: product.brand,
+    country: product.country,
     slug: product.slug,
     permalink: product.permalink,
     price: Number(product.price),
@@ -153,7 +190,7 @@ function serializeSearchProducts(
 
 function SummaryBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-lg bg-zinc-50 px-3 py-2">
+    <div className="min-w-0 rounded-2xl bg-zinc-50 px-3 py-2">
       <p className="text-xs font-medium text-zinc-400">{label}</p>
       <p className="mt-0.5 truncate text-lg font-semibold text-zinc-900">
         {value}
@@ -169,10 +206,6 @@ function normalizeSearch(query: string): NormalizedSearch | null {
     return null;
   }
 
-  // Samma grundregel som i kassan:
-  // - https-länk blir slug-sökning
-  // - bara siffror blir exakt nummer/EAN/Woo-ID
-  // - annan text blir namnsökning
   if (/^https?:\/\//i.test(rawQuery)) {
     const slug = extractSlugFromUrl(rawQuery);
 
@@ -226,9 +259,6 @@ function extractSlugFromUrl(value: string): string {
   try {
     const url = new URL(value);
     const parts = url.pathname.split("/").filter(Boolean);
-
-    // En QR-kod kan innehålla t.ex. /produkt/cigarr-premium-no-1.
-    // Sista delen i URL:en är då sluggen vi redan lagrar lokalt.
     return parts.at(-1) ?? "";
   } catch {
     return "";

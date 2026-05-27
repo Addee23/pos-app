@@ -1,59 +1,171 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 
 type StoreOption = {
   id: string;
   name: string;
 };
 
-export type ProductPickOption = {
+type ProductPickOption = {
   id: string;
   name: string;
   wooProductId: number;
-  storeId: string;
-  storeName: string;
 };
 
 type ProductUpdateToolsProps = {
   stores: StoreOption[];
-  products: ProductPickOption[];
   defaultStoreId?: string;
 };
 
 export function ProductUpdateTools({
   stores,
-  products,
   defaultStoreId = "",
 }: ProductUpdateToolsProps) {
   const [storeId, setStoreId] = useState(
     defaultStoreId || stores[0]?.id || "",
   );
-  const [selectedProductId, setSelectedProductId] = useState(
-    products[0]?.id ?? "",
-  );
+  const [products, setProducts] = useState<ProductPickOption[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productsError, setProductsError] = useState<string | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [fetchedJson, setFetchedJson] = useState("");
   const [fetchingJson, setFetchingJson] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const storeProducts = useMemo(
-    () =>
-      storeId
-        ? products.filter((product) => product.storeId === storeId)
-        : products,
-    [products, storeId],
-  );
+  useEffect(() => {
+    if (!storeId) {
+      setProducts([]);
+      setSelectedProductId("");
+      setProductsError(null);
+      return;
+    }
 
-  const activeProductId =
-    selectedProductId &&
-    storeProducts.some((product) => product.id === selectedProductId)
-      ? selectedProductId
-      : storeProducts[0]?.id ?? "";
+    let cancelled = false;
+    setLoadingProducts(true);
+    setProductsError(null);
+
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/products?storeId=${encodeURIComponent(storeId)}`,
+        );
+        const data = (await response.json()) as
+          | Array<{ id: string; name: string; wooProductId: number }>
+          | { error?: string };
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!response.ok) {
+          const message =
+            !Array.isArray(data) && data.error
+              ? data.error
+              : "Kunde inte ladda produkter för butiken";
+          setProducts([]);
+          setProductsError(message);
+          return;
+        }
+
+        if (!Array.isArray(data)) {
+          setProducts([]);
+          setProductsError("Kunde inte läsa produktlistan");
+          return;
+        }
+
+        const options = data.map((product) => ({
+          id: product.id,
+          name: product.name,
+          wooProductId: product.wooProductId,
+        }));
+
+        setProducts(options);
+        setSelectedProductId(options[0]?.id ?? "");
+      } catch {
+        if (!cancelled) {
+          setProducts([]);
+          setProductsError("Något gick fel vid laddning av produkter");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingProducts(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [storeId]);
+
+  const activeProductId = useMemo(() => {
+    if (
+      selectedProductId &&
+      products.some((product) => product.id === selectedProductId)
+    ) {
+      return selectedProductId;
+    }
+
+    return products[0]?.id ?? "";
+  }, [products, selectedProductId]);
+
+  async function handleSyncProducts() {
+    if (!storeId) {
+      setSyncError("Välj butik först.");
+      return;
+    }
+
+    const shouldSync = window.confirm(
+      "Uppdatera befintliga produkter från WooCommerce? Nya produkter i Woo som saknas lokalt hoppas över.",
+    );
+
+    if (!shouldSync) {
+      return;
+    }
+
+    setSyncing(true);
+    setSyncError(null);
+    setSyncMessage(null);
+
+    try {
+      const response = await fetch(`/api/stores/${storeId}/products/sync`, {
+        method: "POST",
+      });
+      const data = (await response.json()) as {
+        error?: string;
+        importedProducts?: number;
+        importedVariants?: number;
+        skippedProducts?: number;
+        fetchedFromWoo?: number;
+      };
+
+      if (!response.ok) {
+        setSyncError(data.error ?? "Kunde inte uppdatera produkter");
+        return;
+      }
+
+      setSyncMessage(
+        `${data.importedProducts ?? 0} produkter och ${data.importedVariants ?? 0} varianter uppdaterades.` +
+          (data.skippedProducts
+            ? ` ${data.skippedProducts} nya i Woo hoppades över.`
+            : ""),
+      );
+    } catch {
+      setSyncError("Något gick fel vid uppdateringen");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function handleFetchProductJson() {
     if (!activeProductId) {
-      setFetchError("Välj en produkt i listan.");
+      setFetchError("Välj en produkt.");
       return;
     }
 
@@ -95,73 +207,128 @@ export function ProductUpdateTools({
     }
   }
 
+  const busy = syncing || fetchingJson;
+
   return (
-    <section className="rounded-lg border border-zinc-200 bg-white p-4">
-      <h4 className="text-sm font-bold text-zinc-900">Produkt-JSON</h4>
-
-      <label className="mt-3 flex flex-col gap-1 text-sm font-semibold text-zinc-700">
-        Butik
-        <select
-          value={storeId}
-          onChange={(event) => setStoreId(event.target.value)}
-          className="min-h-11 cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
+    <section className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm">
+      <div className="grid grid-cols-1 gap-2 border-b border-zinc-100 p-3 sm:grid-cols-2">
+        <Link
+          href="/admin/products/new"
+          className="flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-accent px-4 text-sm font-bold text-accent-foreground shadow-sm transition hover:bg-blue-600"
         >
-          <option value="">Välj butik</option>
-          {stores.map((store) => (
-            <option key={store.id} value={store.id}>
-              {store.name}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="mt-3 flex flex-col gap-1 text-sm font-semibold text-zinc-700">
-        Produkt
-        <select
-          value={activeProductId}
-          onChange={(event) => setSelectedProductId(event.target.value)}
-          className="min-h-11 cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 text-sm font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
-        >
-          <option value="">Välj produkt</option>
-          {storeProducts.map((product) => (
-            <option key={product.id} value={product.id}>
-              {product.name}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <div className="mt-3 flex flex-wrap gap-2">
+          Lägg till produkt
+        </Link>
         <button
           type="button"
-          onClick={() => void handleFetchProductJson()}
-          disabled={fetchingJson || !activeProductId}
-          className="min-h-10 cursor-pointer rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:shadow-none"
+          onClick={() => void handleSyncProducts()}
+          disabled={busy || !storeId}
+          className="min-h-11 cursor-pointer rounded-xl border border-zinc-200 bg-white px-4 text-sm font-bold text-zinc-800 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {fetchingJson ? "Hämtar..." : "Hämta JSON"}
-        </button>
-        <button
-          type="button"
-          onClick={() => void handleCopyJson()}
-          disabled={!fetchedJson}
-          className="min-h-10 cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {copied ? "Kopierad!" : "Kopiera JSON"}
+          {syncing ? "Uppdaterar…" : "Uppdatera produkter"}
         </button>
       </div>
 
-      <textarea
-        readOnly
-        value={fetchedJson}
-        rows={12}
-        className="mt-3 min-h-48 w-full resize-y rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-xs leading-5 text-zinc-800 outline-none"
-      />
+      <div className="flex flex-col gap-4 p-4">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-zinc-500">Butik</span>
+          <select
+            value={storeId}
+            onChange={(event) => {
+              setStoreId(event.target.value);
+              setSyncMessage(null);
+              setSyncError(null);
+              setFetchedJson("");
+              setFetchError(null);
+            }}
+            className="h-10 w-full cursor-pointer rounded-xl bg-zinc-100/80 px-3 text-sm text-zinc-900 outline-none focus:bg-white focus:ring-2 focus:ring-zinc-200"
+          >
+            <option value="">Välj butik</option>
+            {stores.map((store) => (
+              <option key={store.id} value={store.id}>
+                {store.name}
+              </option>
+            ))}
+          </select>
+        </label>
 
-      {fetchError ? (
-        <p className="mt-2 rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
-          {fetchError}
-        </p>
-      ) : null}
+        {syncMessage ? (
+          <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            {syncMessage}
+          </p>
+        ) : null}
+        {syncError ? (
+          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+            {syncError}
+          </p>
+        ) : null}
+
+        <div className="rounded-xl border border-zinc-100 bg-zinc-50/50 p-3">
+          <p className="text-xs font-semibold text-zinc-700">Hämta JSON</p>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            Välj en produkt och hämta dess data som JSON.
+          </p>
+
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <select
+              value={activeProductId}
+              onChange={(event) => setSelectedProductId(event.target.value)}
+              disabled={loadingProducts || products.length === 0}
+              className="h-10 min-w-0 flex-1 cursor-pointer rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none disabled:opacity-50"
+            >
+              <option value="">
+                {loadingProducts
+                  ? "Laddar produkter…"
+                  : products.length === 0
+                    ? "Inga produkter i butiken"
+                    : "Välj produkt"}
+              </option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => void handleFetchProductJson()}
+              disabled={busy || !activeProductId}
+              className="h-10 shrink-0 cursor-pointer rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:bg-zinc-300"
+            >
+              {fetchingJson ? "Hämtar…" : "Hämta JSON"}
+            </button>
+          </div>
+
+          {productsError ? (
+            <p className="mt-2 text-xs text-red-600">{productsError}</p>
+          ) : null}
+
+          {fetchedJson ? (
+            <>
+              <textarea
+                readOnly
+                value={fetchedJson}
+                rows={8}
+                className="mt-3 w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 font-mono text-xs leading-5 text-zinc-700 outline-none"
+              />
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleCopyJson()}
+                  className="h-9 cursor-pointer rounded-lg px-3 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100"
+                >
+                  {copied ? "Kopierad" : "Kopiera"}
+                </button>
+              </div>
+            </>
+          ) : null}
+
+          {fetchError ? (
+            <p className="mt-2 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-700">
+              {fetchError}
+            </p>
+          ) : null}
+        </div>
+      </div>
     </section>
   );
 }

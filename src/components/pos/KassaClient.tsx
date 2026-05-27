@@ -65,9 +65,10 @@ type SaleResponse = {
 
 type KassaClientProps = {
   store: PosStore;
+  isAdmin?: boolean;
 };
 
-export function KassaClient({ store }: KassaClientProps) {
+export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchItem[]>([]);
@@ -178,6 +179,27 @@ export function KassaClient({ store }: KassaClientProps) {
           : item,
       );
     });
+  }
+
+  function cancelCart() {
+    if (cart.length === 0) {
+      return;
+    }
+
+    const shouldCancel = window.confirm(
+      "Avbryt köpet? Alla varor tas bort från varukorgen.",
+    );
+
+    if (!shouldCancel) {
+      return;
+    }
+
+    setCart([]);
+    setError(null);
+    setSuccess(null);
+    setSearchResults([]);
+    setResultPopupOpen(false);
+    setSuccess("Köpet avbröts och varukorgen tömdes.");
   }
 
   function changeQuantity(cartKey: string, change: number) {
@@ -302,7 +324,9 @@ export function KassaClient({ store }: KassaClientProps) {
         error={error}
         success={success}
         saving={saving}
+        isAdmin={isAdmin}
         onChangeQuantity={changeQuantity}
+        onCancelCart={cancelCart}
         onCompleteSale={completeSale}
       />
 
@@ -559,7 +583,9 @@ function CartPanel({
   error,
   success,
   saving,
+  isAdmin,
   onChangeQuantity,
+  onCancelCart,
   onCompleteSale,
 }: {
   cart: CartItem[];
@@ -567,7 +593,9 @@ function CartPanel({
   error: string | null;
   success: string | null;
   saving: boolean;
+  isAdmin: boolean;
   onChangeQuantity: (cartKey: string, change: number) => void;
+  onCancelCart: () => void;
   onCompleteSale: () => void;
 }) {
   return (
@@ -648,14 +676,26 @@ function CartPanel({
         {error ? <Alert type="error" message={error} /> : null}
         {success ? <Alert type="success" message={success} /> : null}
 
-        <button
-          type="button"
-          onClick={onCompleteSale}
-          disabled={saving || cart.length === 0}
-          className="mt-4 min-h-12 w-full cursor-pointer rounded-2xl bg-accent px-4 text-sm font-bold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {saving ? "Slutför..." : "Slutför köp"}
-        </button>
+        <div className="mt-4 flex flex-col gap-2">
+          {isAdmin && cart.length > 0 ? (
+            <button
+              type="button"
+              onClick={onCancelCart}
+              disabled={saving}
+              className="min-h-11 w-full cursor-pointer rounded-2xl border border-red-200 bg-red-50 px-4 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Avbryt köp
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onCompleteSale}
+            disabled={saving || cart.length === 0}
+            className="min-h-12 w-full cursor-pointer rounded-2xl bg-accent px-4 text-sm font-bold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? "Slutför..." : "Slutför köp"}
+          </button>
+        </div>
       </section>
     </aside>
   );

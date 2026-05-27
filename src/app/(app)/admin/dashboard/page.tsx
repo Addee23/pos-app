@@ -9,274 +9,449 @@ export default async function AdminDashboardPage() {
     redirect("/kassa");
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const sevenDaysAgo = new Date(today);
+  const today = startOfDay(new Date());
+  const yesterday = startOfDay(new Date());
+  yesterday.setDate(yesterday.getDate() - 1);
+  const sevenDaysAgo = startOfDay(new Date());
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
 
   const [
     productCount,
     lowStockCount,
-    pickupCount,
     openPickupCount,
     todaySales,
+    yesterdaySales,
+    chartSales,
     recentSales,
-    recentAuditLogs,
+    storeName,
+    userCount,
+    adminCount,
+    personalCount,
   ] = await Promise.all([
     prisma.product.count(),
     prisma.product.count({ where: { stockQuantity: { lte: 5 } } }),
-    prisma.pickup.count(),
     prisma.pickup.count({ where: { status: "READY" } }),
     prisma.sale.findMany({
       where: { createdAt: { gte: today } },
       select: { total: true },
     }),
     prisma.sale.findMany({
+      where: { createdAt: { gte: yesterday, lt: today } },
+      select: { total: true },
+    }),
+    prisma.sale.findMany({
       where: { createdAt: { gte: sevenDaysAgo } },
+      select: { total: true, createdAt: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.sale.findMany({
       select: { id: true, total: true, createdAt: true },
       orderBy: { createdAt: "desc" },
-      take: 20,
+      take: 5,
     }),
-    prisma.auditLog.findMany({
-      select: { id: true, field: true, createdAt: true },
-      orderBy: { createdAt: "desc" },
-      take: 3,
-    }),
+    session.user.storeId
+      ? prisma.store
+          .findUnique({
+            where: { id: session.user.storeId },
+            select: { name: true },
+          })
+          .then((store) => store?.name ?? null)
+      : prisma.store
+          .findFirst({ orderBy: { name: "asc" }, select: { name: true } })
+          .then((store) => store?.name ?? null),
+    prisma.user.count(),
+    prisma.user.count({ where: { role: "ADMIN" } }),
+    prisma.user.count({ where: { role: "PERSONAL" } }),
   ]);
 
-  const todayRevenue = todaySales.reduce(
-    (sum, sale) => sum + Number(sale.total),
-    0,
-  );
-  const chartDays = buildSalesChart(recentSales);
+  const todayRevenue = sumTotals(todaySales);
+  const yesterdayRevenue = sumTotals(yesterdaySales);
+  const avgReceipt =
+    todaySales.length > 0 ? todayRevenue / todaySales.length : 0;
+  const yesterdayAvg =
+    yesterdaySales.length > 0
+      ? yesterdayRevenue / yesterdaySales.length
+      : 0;
+
+  const chartDays = buildSalesChart(chartSales);
 
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-4 pb-2">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold text-zinc-400">Välkommen tillbaka</p>
-          <h2 className="mt-1 text-2xl font-bold tracking-tight text-zinc-950">
+          <h2 className="text-2xl font-bold tracking-tight text-zinc-950">
             Dashboard
           </h2>
+          {storeName ? (
+            <p className="mt-0.5 text-sm text-zinc-500">{storeName}</p>
+          ) : null}
         </div>
-        <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-bold text-zinc-600 shadow-sm">
+        <span className="rounded-full border border-orange-100 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-700">
           Idag
         </span>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <StatCard
-          tone="amber"
-          icon="▦"
-          label="Produkter"
-          value={String(productCount)}
-          detail={`${lowStockCount} lågt lager`}
-        />
-        <StatCard
-          tone="emerald"
-          icon="✓"
-          label="Försäljning"
+        <KpiCard
+          icon="🛒"
+          iconTone="orange"
+          label="Försäljning idag"
           value={`${formatPrice(todayRevenue)} kr`}
-          detail={`${todaySales.length} köp idag`}
+          trend={percentChange(todayRevenue, yesterdayRevenue)}
+          trendLabel="jämfört med igår"
         />
-        <StatCard
-          tone="blue"
-          icon="↧"
-          label="Upphämtning"
+        <KpiCard
+          icon="📋"
+          iconTone="blue"
+          label="Antal köp"
+          value={String(todaySales.length)}
+          trend={percentChange(todaySales.length, yesterdaySales.length)}
+          trendLabel="jämfört med igår"
+        />
+        <KpiCard
+          icon="🧾"
+          iconTone="violet"
+          label="Snitt per kvitto"
+          value={`${formatPrice(avgReceipt)} kr`}
+          trend={percentChange(avgReceipt, yesterdayAvg)}
+          trendLabel="jämfört med igår"
+        />
+        <KpiCard
+          icon="📦"
+          iconTone="emerald"
+          label="Redo att hämta"
           value={String(openPickupCount)}
-          detail={`${pickupCount} totalt`}
-        />
-        <StatCard
-          tone="violet"
-          icon="≣"
-          label="Aktivitet"
-          value={String(recentAuditLogs.length)}
-          detail="senaste loggar"
+          detail={
+            lowStockCount > 0
+              ? `${lowStockCount} produkter med lågt lager`
+              : `${productCount} produkter i katalogen`
+          }
         />
       </div>
 
-      <section className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <section className="rounded-3xl border border-zinc-200/80 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-bold text-zinc-950">Försäljning</h3>
-            <p className="mt-1 text-xs text-zinc-500">Senaste 7 dagarna</p>
-          </div>
-          <Link
-            href="/admin/reports"
-            className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700"
-          >
-            Rapport
-          </Link>
+          <h3 className="text-sm font-bold text-zinc-950">Försäljning</h3>
+          <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[10px] font-bold text-zinc-600">
+            7 dagar
+          </span>
         </div>
-        <div className="mt-5 flex h-28 items-end gap-2">
-          {chartDays.map((day) => (
-            <div key={day.label} className="flex flex-1 flex-col items-center gap-2">
-              <div className="flex h-20 w-full items-end rounded-full bg-zinc-50 px-1">
-                <div
-                  className="w-full rounded-full bg-blue-400"
-                  style={{ height: `${Math.max(day.percent, 8)}%` }}
-                />
-              </div>
-              <span className="text-[10px] font-semibold text-zinc-400">
-                {day.label}
-              </span>
-            </div>
-          ))}
-        </div>
+        <SalesLineChart days={chartDays} />
       </section>
 
-      <div className="grid grid-cols-2 gap-3">
-        <section className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-zinc-950">Senaste köp</h3>
-            <Link href="/admin/sales" className="text-xs font-bold text-blue-700">
-              Visa
-            </Link>
-          </div>
-          <div className="mt-3 flex flex-col gap-2">
-            {recentSales.slice(0, 3).map((sale) => (
-              <MiniRow
+      <section className="rounded-3xl border border-zinc-200/80 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-zinc-950">
+            Senaste transaktioner
+          </h3>
+          <Link
+            href="/admin/sales"
+            className="text-xs font-bold text-blue-600"
+          >
+            Visa alla
+          </Link>
+        </div>
+        <ul className="mt-3 flex flex-col gap-2">
+          {recentSales.length > 0 ? (
+            recentSales.map((sale) => (
+              <li
                 key={sale.id}
-                title={`${formatPrice(Number(sale.total))} kr`}
-                text={formatTime(sale.createdAt)}
-              />
-            ))}
-            {recentSales.length === 0 ? (
-              <p className="text-xs text-zinc-500">Inga köp ännu.</p>
-            ) : null}
-          </div>
-        </section>
+                className="flex items-center gap-3 rounded-2xl bg-zinc-50 px-3 py-2.5"
+              >
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm">
+                  ✓
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-bold text-zinc-800">
+                    {formatSaleRef(sale.id)}
+                  </p>
+                  <p className="text-[11px] text-zinc-500">
+                    {formatTime(sale.createdAt)}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-xs font-bold text-zinc-900">
+                    {formatPrice(Number(sale.total))} kr
+                  </p>
+                  <p className="text-[10px] font-semibold text-emerald-600">
+                    Slutförd
+                  </p>
+                </div>
+              </li>
+            ))
+          ) : (
+            <li className="rounded-2xl bg-zinc-50 px-3 py-6 text-center text-xs text-zinc-500">
+              Inga köp registrerade ännu.
+            </li>
+          )}
+        </ul>
+      </section>
 
-        <section className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-zinc-950">Sync status</h3>
-            <Link href="/admin/logs" className="text-xs font-bold text-blue-700">
-              Logs
-            </Link>
+      <section className="rounded-3xl border border-zinc-200/80 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-zinc-950">Sync-status</h3>
+          <Link href="/admin/logs" className="text-xs font-bold text-blue-600">
+            Loggar
+          </Link>
+        </div>
+        <ul className="mt-3 flex flex-col gap-2">
+          <SyncRow label="Produkter" detail="Lokal katalog" status="ok" />
+          <SyncRow
+            label="WooCommerce"
+            detail="Webhook & API"
+            status="pending"
+          />
+          <SyncRow label="Audit logs" detail="Produktändringar" status="ok" />
+        </ul>
+      </section>
+
+      <section className="overflow-hidden rounded-3xl border border-violet-200/80 bg-gradient-to-br from-violet-50 via-white to-white p-4 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-xl">
+            👥
           </div>
-          <div className="mt-3 flex flex-col gap-2">
-            <MiniRow title="Produkter" text="Lokal data" status="OK" />
-            <MiniRow title="WooCommerce" text="Väntar på API" status="Senare" />
-            <MiniRow title="Audit logs" text="Aktivt" status="OK" />
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-bold text-zinc-950">
+              Team & behörigheter
+            </h3>
+            <p className="mt-0.5 text-xs leading-5 text-zinc-500">
+              Skapa personal och admin, tilldela butik och roller.
+            </p>
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              <UserStatPill label="Totalt" value={userCount} />
+              <UserStatPill label="Personal" value={personalCount} />
+              <UserStatPill label="Admin" value={adminCount} />
+            </div>
           </div>
-        </section>
-      </div>
+        </div>
+        <Link
+          href="/admin/users"
+          className="mt-4 flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-violet-600 px-4 text-sm font-bold text-white shadow-sm shadow-violet-200 transition hover:bg-violet-700"
+        >
+          Hantera användare
+          <span aria-hidden>→</span>
+        </Link>
+      </section>
 
       <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-zinc-950">Snabbåtkomst</h3>
-          <span className="text-xs font-semibold text-zinc-400">Admin</span>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <DashboardAction href="/kassa" icon="□" title="Kassa" />
-          <DashboardAction href="/admin/products" icon="▦" title="Produkter" />
-          <DashboardAction href="/sok" icon="⌕" title="Sök" />
-          <DashboardAction href="/upphamtning" icon="↧" title="Hämta" />
-          <DashboardAction href="/admin/users" icon="◎" title="Användare" />
-          <DashboardAction href="/admin/settings" icon="⚙" title="Settings" />
+        <h3 className="mb-3 text-sm font-bold text-zinc-950">
+          Snabbfunktioner
+        </h3>
+        <div className="grid grid-cols-3 gap-2">
+          <QuickAction href="/kassa" icon="🛒" label="Kassa" />
+          <QuickAction href="/sok" icon="🔍" label="Sök produkt" />
+          <QuickAction href="/admin/products" icon="📦" label="Produkter" />
         </div>
       </section>
     </section>
   );
 }
 
-function StatCard({
-  tone,
+function KpiCard({
   icon,
+  iconTone,
   label,
   value,
+  trend,
+  trendLabel,
   detail,
 }: {
-  tone: "amber" | "emerald" | "blue" | "violet";
   icon: string;
+  iconTone: "orange" | "blue" | "violet" | "emerald";
   label: string;
   value: string;
-  detail: string;
+  trend?: number | null;
+  trendLabel?: string;
+  detail?: string;
 }) {
   const tones = {
-    amber: "bg-amber-50 text-amber-700",
-    emerald: "bg-emerald-50 text-emerald-700",
-    blue: "bg-blue-50 text-blue-700",
-    violet: "bg-violet-50 text-violet-700",
+    orange: "bg-orange-50 text-orange-600",
+    blue: "bg-blue-50 text-blue-600",
+    violet: "bg-violet-50 text-violet-600",
+    emerald: "bg-emerald-50 text-emerald-600",
   };
 
   return (
-    <article className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm">
-      <div className={`flex size-9 items-center justify-center rounded-2xl ${tones[tone]}`}>
-        <span className="text-base font-bold">{icon}</span>
+    <article className="rounded-3xl border border-zinc-200/80 bg-white p-3.5 shadow-sm">
+      <div
+        className={`flex size-9 items-center justify-center rounded-2xl text-base ${tones[iconTone]}`}
+      >
+        {icon}
       </div>
-      <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-zinc-400">
+      <p className="mt-2.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400">
         {label}
       </p>
-      <p className="mt-1 truncate text-lg font-bold text-zinc-950">{value}</p>
-      <p className="mt-1 truncate text-xs text-zinc-500">{detail}</p>
+      <p className="mt-0.5 truncate text-lg font-bold text-zinc-950">
+        {value}
+      </p>
+      {trend != null && trendLabel ? (
+        <p
+          className={`mt-1 text-[11px] font-semibold ${
+            trend >= 0 ? "text-emerald-600" : "text-red-500"
+          }`}
+        >
+          {formatTrend(trend)} {trendLabel}
+        </p>
+      ) : detail ? (
+        <p className="mt-1 truncate text-[11px] text-zinc-500">{detail}</p>
+      ) : null}
     </article>
   );
 }
 
-function DashboardAction({
+function SalesLineChart({
+  days,
+}: {
+  days: { label: string; total: number; percent: number }[];
+}) {
+  const width = 320;
+  const height = 96;
+  const padding = 4;
+  const points = days.map((day, index) => {
+    const x =
+      padding +
+      (index / Math.max(days.length - 1, 1)) * (width - padding * 2);
+    const y =
+      height - padding - (day.percent / 100) * (height - padding * 2);
+    return { x, y };
+  });
+
+  const linePath = points
+    .map((point, index) =>
+      index === 0
+        ? `M ${point.x} ${point.y}`
+        : `L ${point.x} ${point.y}`,
+    )
+    .join(" ");
+
+  const areaPath = `${linePath} L ${points.at(-1)?.x ?? width} ${height} L ${points[0]?.x ?? 0} ${height} Z`;
+
+  return (
+    <div className="mt-4">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-24 w-full"
+        aria-hidden
+      >
+        <defs>
+          <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#fb923c" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#fb923c" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        <path d={areaPath} fill="url(#salesFill)" />
+        <path
+          d={linePath}
+          fill="none"
+          stroke="#f97316"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {points.map((point, index) => (
+          <circle
+            key={index}
+            cx={point.x}
+            cy={point.y}
+            r="3"
+            fill="#fff"
+            stroke="#f97316"
+            strokeWidth="2"
+          />
+        ))}
+      </svg>
+      <div className="mt-1 grid grid-cols-7 gap-1">
+        {days.map((day) => (
+          <span
+            key={day.label}
+            className="text-center text-[10px] font-semibold text-zinc-400"
+          >
+            {day.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SyncRow({
+  label,
+  detail,
+  status,
+}: {
+  label: string;
+  detail: string;
+  status: "ok" | "pending" | "error";
+}) {
+  const badges = {
+    ok: { text: "OK", className: "bg-emerald-50 text-emerald-700" },
+    pending: { text: "Senare", className: "bg-amber-50 text-amber-700" },
+    error: { text: "Fel", className: "bg-red-50 text-red-700" },
+  };
+  const badge = badges[status];
+
+  return (
+    <li className="flex items-center justify-between gap-2 rounded-2xl bg-zinc-50 px-3 py-2">
+      <div className="min-w-0">
+        <p className="truncate text-xs font-bold text-zinc-800">{label}</p>
+        <p className="truncate text-[11px] text-zinc-500">{detail}</p>
+      </div>
+      <span
+        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.className}`}
+      >
+        {badge.text}
+      </span>
+    </li>
+  );
+}
+
+function UserStatPill({ label, value }: { label: string; value: number }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-700">
+      <span className="text-violet-600">{value}</span>
+      {label}
+    </span>
+  );
+}
+
+function QuickAction({
   href,
   icon,
-  title,
+  label,
 }: {
   href: string;
   icon: string;
-  title: string;
+  label: string;
 }) {
   return (
     <Link
       href={href}
-      className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-3xl border border-zinc-200 bg-white px-2 text-center shadow-sm transition hover:border-blue-200 hover:bg-blue-50"
+      className="flex min-h-[4.5rem] flex-col items-center justify-center gap-1.5 rounded-2xl border border-zinc-200/80 bg-white px-1 py-3 text-center shadow-sm transition hover:border-blue-200 hover:bg-blue-50/50"
     >
-      <span className="flex size-9 items-center justify-center rounded-2xl bg-blue-50 text-lg font-bold text-blue-700">
-        {icon}
+      <span className="text-xl">{icon}</span>
+      <span className="text-[11px] font-bold leading-tight text-zinc-700">
+        {label}
       </span>
-      <span className="text-[11px] font-bold text-zinc-700">{title}</span>
     </Link>
-  );
-}
-
-function MiniRow({
-  title,
-  text,
-  status,
-}: {
-  title: string;
-  text: string;
-  status?: string;
-}) {
-  return (
-    <div className="min-w-0 rounded-2xl bg-zinc-50 px-3 py-2">
-      <div className="flex items-center justify-between gap-2">
-        <p className="truncate text-xs font-bold text-zinc-800">{title}</p>
-        {status ? (
-          <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-blue-700">
-            {status}
-          </span>
-        ) : null}
-      </div>
-      <p className="mt-0.5 truncate text-[11px] text-zinc-500">{text}</p>
-    </div>
   );
 }
 
 function buildSalesChart(sales: { total: unknown; createdAt: Date }[]) {
   const days = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date();
-    date.setHours(0, 0, 0, 0);
+    const date = startOfDay(new Date());
     date.setDate(date.getDate() - (6 - index));
     return {
       date,
-      label: new Intl.DateTimeFormat("sv-SE", { weekday: "short" }).format(date),
+      label: new Intl.DateTimeFormat("sv-SE", { weekday: "short" }).format(
+        date,
+      ),
       total: 0,
       percent: 0,
     };
   });
 
   for (const sale of sales) {
-    const saleDate = new Date(sale.createdAt);
-    saleDate.setHours(0, 0, 0, 0);
+    const saleDate = startOfDay(new Date(sale.createdAt));
     const day = days.find((item) => item.date.getTime() === saleDate.getTime());
     if (day) {
       day.total += Number(sale.total);
@@ -285,13 +460,42 @@ function buildSalesChart(sales: { total: unknown; createdAt: Date }[]) {
 
   const max = Math.max(...days.map((day) => day.total), 1);
   return days.map((day) => ({
-    ...day,
+    label: day.label,
+    total: day.total,
     percent: (day.total / max) * 100,
   }));
 }
 
+function sumTotals(sales: { total: unknown }[]): number {
+  return sales.reduce((sum, sale) => sum + Number(sale.total), 0);
+}
+
+function percentChange(current: number, previous: number): number | null {
+  if (previous === 0) {
+    return current > 0 ? 100 : null;
+  }
+  return ((current - previous) / previous) * 100;
+}
+
+function formatTrend(value: number): string {
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(1)}%`;
+}
+
+function formatSaleRef(id: string): string {
+  return `#KO-${id.slice(-5).toUpperCase()}`;
+}
+
+function startOfDay(date: Date): Date {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
 function formatPrice(value: number): string {
-  return value.toFixed(0);
+  return new Intl.NumberFormat("sv-SE", {
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 function formatTime(date: Date): string {
