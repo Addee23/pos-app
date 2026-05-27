@@ -34,6 +34,10 @@ yarn-error.log*
 .env*
 !.env.example
 
+# local product import (keep example committed)
+/data/woo-products.json
+/data/woo-order.json
+
 # vercel
 .vercel
 

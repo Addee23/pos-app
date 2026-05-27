@@ -64,6 +64,17 @@ export async function PATCH(_request: Request, { params }: RouteParams) {
       },
       include: {
         pickedUpBy: { select: { name: true, email: true } },
+        items: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            productName: true,
+            variantName: true,
+            productSlug: true,
+            productImageUrl: true,
+            quantity: true,
+          },
+        },
       },
     });
 
