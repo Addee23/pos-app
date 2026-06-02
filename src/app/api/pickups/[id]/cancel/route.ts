@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { PickupStatus } from "@/generated/prisma/client";
-import { isAdmin } from "@/lib/rbac";
+import { isAdmin } from "../../../../../../rbac";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 

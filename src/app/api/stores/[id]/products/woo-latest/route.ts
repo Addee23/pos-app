@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { formatWooJsonForEditor } from "@/lib/product-woo-json";
-import { isAdmin } from "@/lib/rbac";
+import { isAdmin } from "../../../../../../../rbac";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchLatestWooProducts, hasWooCredentials } from "@/lib/woocommerce-api";
 

@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useId } from "react";
 import { TaxonomyFields } from "@/components/products/TaxonomyFields";
+import { useToast } from "@/components/ui/ToastProvider";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -20,12 +22,11 @@ export function ProductCreateForm({
   defaultStoreId = "",
 }: ProductCreateFormProps) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   const [creating, setCreating] = useState(false);
 
   async function createProduct(formData: FormData) {
     setCreating(true);
-    setError(null);
 
     const body = {
       storeId: formData.get("storeId"),
@@ -50,7 +51,7 @@ export function ProductCreateForm({
       const data = (await response.json()) as { error?: string; id?: string };
 
       if (!response.ok) {
-        setError(data.error ?? "Kunde inte skapa produkten");
+        toast.error(data.error ?? "Kunde inte skapa produkten");
         return;
       }
 
@@ -59,7 +60,7 @@ export function ProductCreateForm({
         router.refresh();
       }
     } catch {
-      setError("Något gick fel. Försök igen.");
+      toast.error("Något gick fel. Försök igen.");
     } finally {
       setCreating(false);
     }
@@ -78,22 +79,59 @@ export function ProductCreateForm({
         </p>
       </div>
 
-      <Field label="Butik" name="storeId" type="select" stores={stores} defaultStoreId={defaultStoreId} />
-      <Field label="Produktnamn" name="name" required />
+      <Field
+        label="Butik"
+        name="storeId"
+        type="select"
+        stores={stores}
+        defaultStoreId={defaultStoreId}
+        hint="Produkten skapas i den valda butikens katalog."
+      />
+      <Field
+        label="Produktnamn"
+        name="name"
+        required
+        placeholder="t.ex. Cigarr Premium"
+        hint="Namnet visas i kassa, katalog och upphämtningsmail."
+      />
       <Field
         label="Kort beskrivning"
         name="shortDescription"
+        placeholder="Kort text om produkten…"
         hint="Visas i upphämtningsmail och katalog."
       />
-      <Field label="Pris (kr)" name="price" type="number" min="0" step="0.01" defaultValue="0" />
-      <Field label="EAN" name="ean" />
-      <Field label="Lagersaldo" name="stockQuantity" type="number" min="0" defaultValue="0" />
-      <Field label="Lagerplats" name="stockLocation" />
+      <Field
+        label="Pris (kr)"
+        name="price"
+        type="number"
+        min="0"
+        step="0.01"
+        defaultValue="0"
+        placeholder="0.00"
+        hint="Pris i kronor exkl. eventuell moms."
+      />
+      <Field
+        label="EAN"
+        name="ean"
+        placeholder="7350012345678"
+        hint="Streckkod, SKU eller EAN. Används vid skanning i kassan."
+      />
+      <Field
+        label="Lagersaldo"
+        name="stockQuantity"
+        type="number"
+        min="0"
+        defaultValue="0"
+        placeholder="0"
+        hint="Antal i lager just nu."
+      />
+      <Field
+        label="Lagerplats"
+        name="stockLocation"
+        placeholder="Hylla A3"
+        hint="Var produkten står i butiken."
+      />
       <TaxonomyFields />
-
-      {error ? (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <button
@@ -139,14 +177,21 @@ function Field({
   stores?: StoreOption[];
   defaultStoreId?: string;
 }) {
+  const generatedId = useId();
+
   if (type === "select" && stores) {
+    const selectId = `${name}-select-${generatedId}`;
+    const hintId = hint ? `${selectId}-hint` : undefined;
+
     return (
-      <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+      <label htmlFor={selectId} className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
         {label}
         <select
+          id={selectId}
           name={name}
           required
           defaultValue={defaultStoreId || stores[0]?.id || ""}
+          aria-describedby={hintId}
           className="min-h-12 cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
         >
           <option value="">Välj butik</option>
@@ -156,15 +201,23 @@ function Field({
             </option>
           ))}
         </select>
-        {hint ? <span className="text-xs font-normal text-zinc-500">{hint}</span> : null}
+        {hint ? (
+          <span id={hintId} className="text-xs font-normal leading-5 text-zinc-500">
+            {hint}
+          </span>
+        ) : null}
       </label>
     );
   }
 
+  const inputId = `${name}-${generatedId}`;
+  const hintId = hint ? `${inputId}-hint` : undefined;
+
   return (
-    <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+    <label htmlFor={inputId} className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
       {label}
       <input
+        id={inputId}
         name={name}
         type={type}
         required={required}
@@ -172,9 +225,14 @@ function Field({
         step={step}
         defaultValue={defaultValue}
         placeholder={placeholder}
-        className="min-h-12 cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
+        aria-describedby={hintId}
+        className="min-h-12 cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
       />
-      {hint ? <span className="text-xs font-normal text-zinc-500">{hint}</span> : null}
+      {hint ? (
+        <span id={hintId} className="text-xs font-normal leading-5 text-zinc-500">
+          {hint}
+        </span>
+      ) : null}
     </label>
   );
 }

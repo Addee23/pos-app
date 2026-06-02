@@ -6,7 +6,7 @@ import {
   hasWooCredentials,
   importWooProductsForStore,
 } from "@/lib/product-import";
-import { isAdmin } from "@/lib/rbac";
+import { isAdmin } from "../../../../../../../rbac";
 import { rateLimit } from "@/lib/rate-limit";
 
 type RouteContext = {
@@ -65,9 +65,7 @@ export async function POST(_request: Request, context: RouteContext) {
 
   try {
     const rawProducts = await fetchAllWooProducts(store);
-    const result = await importWooProductsForStore(prisma, store, rawProducts, {
-      updateOnly: true,
-    });
+    const result = await importWooProductsForStore(prisma, store, rawProducts);
 
     return NextResponse.json({
       ...result,

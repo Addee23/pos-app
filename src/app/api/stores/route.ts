@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
-import { isAdmin } from "@/lib/rbac";
+import { isAdmin } from "../../../../rbac";
 
 export async function GET() {
   const session = await auth();

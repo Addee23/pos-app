@@ -7,7 +7,7 @@ import {
 } from "@/lib/mail";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
-import { isAdmin } from "@/lib/rbac";
+import { isAdmin } from "../../../../../../../rbac";
 import { testEmailSchema } from "@/lib/validations/settings";
 
 type RouteContext = {

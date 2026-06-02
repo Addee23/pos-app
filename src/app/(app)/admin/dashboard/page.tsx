@@ -1,9 +1,33 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { auth } from "@/auth";
+import { DashboardSalesSection } from "@/components/dashboard/DashboardSalesSection";
+import { PageLoadingSkeleton } from "@/components/ui/PageLoadingSkeleton";
+import {
+  addDays,
+  buildSalesChartData,
+  formatDateParam,
+  formatPeriodLabel,
+  resolveSalesRange,
+  startOfDay,
+  sumSaleTotals,
+} from "@/lib/dashboard-sales-chart";
 import { prisma } from "@/lib/prisma";
 
-export default async function AdminDashboardPage() {
+export default function AdminDashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageLoadingSkeleton title="Laddar dashboard…" variant="dashboard" />
+      }
+    >
+      <DashboardContent />
+    </Suspense>
+  );
+}
+
+async function DashboardContent() {
   const session = await auth();
   if (session?.user.role !== "ADMIN") {
     redirect("/kassa");
@@ -12,8 +36,7 @@ export default async function AdminDashboardPage() {
   const today = startOfDay(new Date());
   const yesterday = startOfDay(new Date());
   yesterday.setDate(yesterday.getDate() - 1);
-  const sevenDaysAgo = startOfDay(new Date());
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+  const defaultRange = resolveSalesRange(null, null);
 
   const [
     productCount,
@@ -40,7 +63,12 @@ export default async function AdminDashboardPage() {
       select: { total: true },
     }),
     prisma.sale.findMany({
-      where: { createdAt: { gte: sevenDaysAgo } },
+      where: {
+        createdAt: {
+          gte: defaultRange.from,
+          lt: addDays(defaultRange.to, 1),
+        },
+      },
       select: { total: true, createdAt: true },
       orderBy: { createdAt: "asc" },
     }),
@@ -73,7 +101,11 @@ export default async function AdminDashboardPage() {
       ? yesterdayRevenue / yesterdaySales.length
       : 0;
 
-  const chartDays = buildSalesChart(chartSales);
+  const chartDays = buildSalesChartData(
+    chartSales,
+    defaultRange.from,
+    defaultRange.to,
+  );
 
   return (
     <section className="flex flex-col gap-4 pb-2">
@@ -91,7 +123,7 @@ export default async function AdminDashboardPage() {
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard
           icon="🛒"
           iconTone="orange"
@@ -129,15 +161,18 @@ export default async function AdminDashboardPage() {
         />
       </div>
 
-      <section className="rounded-3xl border border-zinc-200/80 bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-sm font-bold text-zinc-950">Försäljning</h3>
-          <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[10px] font-bold text-zinc-600">
-            7 dagar
-          </span>
-        </div>
-        <SalesLineChart days={chartDays} />
-      </section>
+      <div className="grid gap-4 lg:grid-cols-2">
+      <DashboardSalesSection
+        initialFrom={formatDateParam(defaultRange.from)}
+        initialTo={formatDateParam(defaultRange.to)}
+        initialPeriodLabel={formatPeriodLabel(
+          defaultRange.from,
+          defaultRange.to,
+        )}
+        initialTotalRevenue={sumSaleTotals(chartSales)}
+        initialSaleCount={chartSales.length}
+        initialPoints={chartDays}
+      />
 
       <section className="rounded-3xl border border-zinc-200/80 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between gap-2">
@@ -186,7 +221,9 @@ export default async function AdminDashboardPage() {
           )}
         </ul>
       </section>
+      </div>
 
+      <div className="grid gap-4 lg:grid-cols-2">
       <section className="rounded-3xl border border-zinc-200/80 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-bold text-zinc-950">Sync-status</h3>
@@ -232,12 +269,13 @@ export default async function AdminDashboardPage() {
           <span aria-hidden>→</span>
         </Link>
       </section>
+      </div>
 
       <section>
         <h3 className="mb-3 text-sm font-bold text-zinc-950">
           Snabbfunktioner
         </h3>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 lg:grid-cols-6">
           <QuickAction href="/kassa" icon="🛒" label="Kassa" />
           <QuickAction href="/sok" icon="🔍" label="Sök produkt" />
           <QuickAction href="/admin/products" icon="📦" label="Produkter" />
@@ -296,81 +334,6 @@ function KpiCard({
         <p className="mt-1 truncate text-[11px] text-zinc-500">{detail}</p>
       ) : null}
     </article>
-  );
-}
-
-function SalesLineChart({
-  days,
-}: {
-  days: { label: string; total: number; percent: number }[];
-}) {
-  const width = 320;
-  const height = 96;
-  const padding = 4;
-  const points = days.map((day, index) => {
-    const x =
-      padding +
-      (index / Math.max(days.length - 1, 1)) * (width - padding * 2);
-    const y =
-      height - padding - (day.percent / 100) * (height - padding * 2);
-    return { x, y };
-  });
-
-  const linePath = points
-    .map((point, index) =>
-      index === 0
-        ? `M ${point.x} ${point.y}`
-        : `L ${point.x} ${point.y}`,
-    )
-    .join(" ");
-
-  const areaPath = `${linePath} L ${points.at(-1)?.x ?? width} ${height} L ${points[0]?.x ?? 0} ${height} Z`;
-
-  return (
-    <div className="mt-4">
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="h-24 w-full"
-        aria-hidden
-      >
-        <defs>
-          <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#fb923c" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#fb923c" stopOpacity="0.02" />
-          </linearGradient>
-        </defs>
-        <path d={areaPath} fill="url(#salesFill)" />
-        <path
-          d={linePath}
-          fill="none"
-          stroke="#f97316"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        {points.map((point, index) => (
-          <circle
-            key={index}
-            cx={point.x}
-            cy={point.y}
-            r="3"
-            fill="#fff"
-            stroke="#f97316"
-            strokeWidth="2"
-          />
-        ))}
-      </svg>
-      <div className="mt-1 grid grid-cols-7 gap-1">
-        {days.map((day) => (
-          <span
-            key={day.label}
-            className="text-center text-[10px] font-semibold text-zinc-400"
-          >
-            {day.label}
-          </span>
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -484,12 +447,6 @@ function formatTrend(value: number): string {
 
 function formatSaleRef(id: string): string {
   return `#KO-${id.slice(-5).toUpperCase()}`;
-}
-
-function startOfDay(date: Date): Date {
-  const copy = new Date(date);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
 }
 
 function formatPrice(value: number): string {

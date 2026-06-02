@@ -10,7 +10,7 @@ type AppHeaderProps = {
 
 export function AppHeader({ title, subtitle, userName, role }: AppHeaderProps) {
   return (
-    <header className="sticky top-0 z-40 border-b border-zinc-200/70 bg-[#f7f8fb]/95 px-4 pb-3 pt-4 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-zinc-200/70 bg-[#f7f8fb]/95 px-4 pb-3 pt-4 backdrop-blur lg:bg-white/95 lg:px-8">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">

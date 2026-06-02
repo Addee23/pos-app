@@ -2,11 +2,115 @@
 
 import { useRouter } from "next/navigation";
 import type { ChangeEvent } from "react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useId, useRef, useState } from "react";
 import type { Store } from "@/generated/prisma/client";
 import type { WooWebhookMode } from "@/lib/woo-webhook-config";
 import { formatWooJsonForEditor } from "@/lib/product-woo-json";
 import { WooMetaBatchPanel } from "@/components/products/WooMetaBatchPanel";
+import { useToast } from "@/components/ui/ToastProvider";
+
+type SettingsSectionId = "butik" | "woocommerce" | "epost" | "kvitto";
+
+type SettingsSection = {
+  id: SettingsSectionId;
+  label: string;
+  description: string;
+  shortHint: string;
+};
+
+const SETTINGS_SECTIONS: SettingsSection[] = [
+  {
+    id: "butik",
+    label: "Butik",
+    description: "Namn, logo och adress för upphämtningsmail.",
+    shortHint: "Logo & adress",
+  },
+  {
+    id: "woocommerce",
+    label: "WooCommerce",
+    description: "API, webhooks, produktmeta och JSON.",
+    shortHint: "Integration",
+  },
+  {
+    id: "epost",
+    label: "E-post",
+    description: "SMTP och testmail till kunder.",
+    shortHint: "SMTP & test",
+  },
+  {
+    id: "kvitto",
+    label: "Kvitto",
+    description: "Texter och utskriftsformat i kassan.",
+    shortHint: "Utskrift",
+  },
+];
+
+const SECTION_STYLES: Record<
+  SettingsSectionId,
+  {
+    activeSurface: string;
+    activeBorder: string;
+    icon: string;
+    iconActive: string;
+    title: string;
+    bar: string;
+    mobileHeader: string;
+  }
+> = {
+  butik: {
+    activeSurface: "bg-gradient-to-br from-violet-50 via-white to-fuchsia-50/40",
+    activeBorder: "border-violet-200/90 shadow-md shadow-violet-100/80",
+    icon: "bg-violet-100 text-violet-700",
+    iconActive: "bg-violet-600 text-white shadow-md shadow-violet-200",
+    title: "text-violet-950",
+    bar: "bg-violet-500",
+    mobileHeader:
+      "border-violet-200/80 bg-gradient-to-br from-violet-50 via-white to-white",
+  },
+  woocommerce: {
+    activeSurface: "bg-gradient-to-br from-orange-50 via-white to-amber-50/50",
+    activeBorder: "border-orange-200/90 shadow-md shadow-orange-100/80",
+    icon: "bg-orange-100 text-orange-700",
+    iconActive: "bg-orange-500 text-white shadow-md shadow-orange-200",
+    title: "text-orange-950",
+    bar: "bg-orange-500",
+    mobileHeader:
+      "border-orange-200/80 bg-gradient-to-br from-orange-50 via-white to-white",
+  },
+  epost: {
+    activeSurface: "bg-gradient-to-br from-sky-50 via-white to-blue-50/40",
+    activeBorder: "border-sky-200/90 shadow-md shadow-sky-100/80",
+    icon: "bg-sky-100 text-sky-700",
+    iconActive: "bg-sky-600 text-white shadow-md shadow-sky-200",
+    title: "text-sky-950",
+    bar: "bg-sky-500",
+    mobileHeader:
+      "border-sky-200/80 bg-gradient-to-br from-sky-50 via-white to-white",
+  },
+  kvitto: {
+    activeSurface: "bg-gradient-to-br from-emerald-50 via-white to-teal-50/40",
+    activeBorder: "border-emerald-200/90 shadow-md shadow-emerald-100/80",
+    icon: "bg-emerald-100 text-emerald-700",
+    iconActive: "bg-emerald-600 text-white shadow-md shadow-emerald-200",
+    title: "text-emerald-950",
+    bar: "bg-emerald-500",
+    mobileHeader:
+      "border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-white",
+  },
+};
+
+function parseSettingsSection(value: string | undefined): SettingsSectionId {
+  if (
+    value === "butik" ||
+    value === "woocommerce" ||
+    value === "epost" ||
+    value === "kvitto"
+  ) {
+    return value;
+  }
+
+  return "butik";
+}
 
 type StoreOption = Pick<Store, "id" | "name">;
 
@@ -39,6 +143,7 @@ type StoreSettingsFormProps = {
   store: EditableStore;
   baseUrl: string;
   webhookMode: WooWebhookMode;
+  initialSection?: string;
 };
 
 export function StoreSettingsForm({
@@ -46,18 +151,20 @@ export function StoreSettingsForm({
   store,
   baseUrl,
   webhookMode,
+  initialSection,
 }: StoreSettingsFormProps) {
   const router = useRouter();
+  const toast = useToast();
   const createStoreInFlight = useRef(false);
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>(
+    () => parseSettingsSection(initialSection),
+  );
   const [webhookSecret, setWebhookSecret] = useState("");
   const [testEmail, setTestEmail] = useState("adiiinaaaa86@gmail.com");
   const [testingEmail, setTestingEmail] = useState(false);
-  const [testEmailResult, setTestEmailResult] = useState<string | null>(null);
   const [createStoreOpen, setCreateStoreOpen] = useState(false);
   const [creatingStore, setCreatingStore] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const webhookUrls = useMemo(
@@ -77,8 +184,24 @@ export function StoreSettingsForm({
   );
 
   function selectStore(storeId: string) {
-    router.push(`/admin/settings?storeId=${storeId}`);
+    const params = new URLSearchParams();
+    params.set("storeId", storeId);
+    params.set("section", activeSection);
+    router.push(`/admin/settings?${params.toString()}`);
   }
+
+  function selectSection(sectionId: SettingsSectionId) {
+    setActiveSection(sectionId);
+    const params = new URLSearchParams(window.location.search);
+    params.set("section", sectionId);
+    router.replace(`/admin/settings?${params.toString()}`, { scroll: false });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  const activeSectionMeta =
+    SETTINGS_SECTIONS.find((section) => section.id === activeSection) ??
+    SETTINGS_SECTIONS[0];
+  const activeSectionStyle = SECTION_STYLES[activeSection];
 
   async function createStore(formData: FormData) {
     if (createStoreInFlight.current) {
@@ -87,8 +210,6 @@ export function StoreSettingsForm({
 
     createStoreInFlight.current = true;
     setCreatingStore(true);
-    setError(null);
-    setSuccess(false);
 
     try {
       const response = await fetch("/api/stores", {
@@ -98,17 +219,19 @@ export function StoreSettingsForm({
       });
 
       if (!response.ok) {
-        setError(await getErrorMessage(response, "Kunde inte skapa butik"));
+        toast.error(await getErrorMessage(response, "Kunde inte skapa butik"));
         return;
       }
 
       const createdStore = (await response.json()) as { id: string };
       setCreateStoreOpen(false);
-      router.push(`/admin/settings?storeId=${createdStore.id}`);
+      router.push(
+        `/admin/settings?storeId=${createdStore.id}&section=${activeSection}`,
+      );
       router.refresh();
     } catch (error) {
       console.error(error);
-      setError("Något gick fel vid anropet. Försök igen.");
+      toast.error("Något gick fel vid anropet. Försök igen.");
     } finally {
       createStoreInFlight.current = false;
       setCreatingStore(false);
@@ -117,8 +240,6 @@ export function StoreSettingsForm({
 
   async function saveSettings(formData: FormData) {
     setSaving(true);
-    setError(null);
-    setSuccess(false);
 
     const body = {
       name: formData.get("name"),
@@ -149,16 +270,16 @@ export function StoreSettingsForm({
       });
 
       if (!response.ok) {
-        setError(await getErrorMessage(response, "Kunde inte spara inställningar"));
+        toast.error(await getErrorMessage(response, "Kunde inte spara inställningar"));
         return;
       }
 
-      setSuccess(true);
+      toast.success("Inställningarna sparades.");
       setWebhookSecret("");
       router.refresh();
     } catch (error) {
       console.error(error);
-      setError("Något gick fel vid anropet. Försök igen.");
+      toast.error("Något gick fel vid anropet. Försök igen.");
     } finally {
       setSaving(false);
     }
@@ -166,9 +287,6 @@ export function StoreSettingsForm({
 
   async function sendTestEmail() {
     setTestingEmail(true);
-    setError(null);
-    setSuccess(false);
-    setTestEmailResult(null);
 
     try {
       const response = await fetch(`/api/stores/${store.id}/settings/test-email`, {
@@ -178,14 +296,14 @@ export function StoreSettingsForm({
       });
 
       if (!response.ok) {
-        setError(await getErrorMessage(response, "Kunde inte skicka testmail"));
+        toast.error(await getErrorMessage(response, "Kunde inte skicka testmail"));
         return;
       }
 
-      setTestEmailResult(`Testmail skickades till ${testEmail}.`);
+      toast.success(`Testmail skickades till ${testEmail}.`);
     } catch (error) {
       console.error(error);
-      setError("Något gick fel när testmailet skulle skickas.");
+      toast.error("Något gick fel när testmailet skulle skickas.");
     } finally {
       setTestingEmail(false);
     }
@@ -234,7 +352,8 @@ export function StoreSettingsForm({
             <Field
               label="Ny butik"
               name="storeName"
-              placeholder="Butiksnamn"
+              placeholder="t.ex. Demo Butik"
+              hint="Namnet visas i appen och på kvitton."
             />
             <button
               type="submit"
@@ -247,100 +366,298 @@ export function StoreSettingsForm({
         ) : null}
       </section>
 
-      <form action={saveSettings} className="flex flex-col gap-4">
-        <IntegrationCard
-          store={store}
-          webhookMode={webhookMode}
-          webhookSecret={webhookSecret}
-          webhookUrls={webhookUrls}
-          copied={copied}
-          onGenerateSecret={generateWebhookSecret}
-          onWebhookSecretChange={setWebhookSecret}
-          onCopy={copyToClipboard}
+      <div className="flex flex-col gap-4">
+        <SettingsSectionNav
+          activeSection={activeSection}
+          activeDescription={activeSectionMeta.description}
+          onSelect={selectSection}
         />
 
-        <SmtpSettingsCard
-          store={store}
-          testEmail={testEmail}
-          testingEmail={testingEmail}
-          testEmailResult={testEmailResult}
-          onTestEmailChange={setTestEmail}
-          onSendTestEmail={sendTestEmail}
-        />
+        <form action={saveSettings} className="flex min-w-0 flex-col gap-4">
+          <section
+            className={`rounded-3xl border p-4 shadow-sm lg:hidden ${activeSectionStyle.mobileHeader}`}
+          >
+            <div className="flex items-start gap-3">
+              <span
+                className={`flex size-11 shrink-0 items-center justify-center rounded-2xl ${activeSectionStyle.iconActive}`}
+              >
+                <SettingsSectionIcon section={activeSection} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-400">
+                  {activeSectionMeta.shortHint}
+                </p>
+                <h3
+                  className={`mt-0.5 text-base font-bold ${activeSectionStyle.title}`}
+                >
+                  {activeSectionMeta.label}
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-zinc-600">
+                  {activeSectionMeta.description}
+                </p>
+              </div>
+            </div>
+          </section>
 
-        <SettingsCard
-          title="Butik & upphämtningsmail"
-          description="Logo och adress visas i mailet när ordern är redo. Adressen används för Google Maps-kartan."
-        >
-          <Field label="Butiksnamn" name="name" defaultValue={store.name} />
-          <Field
-            label="Logo URL (direkt länk till bild)"
-            name="logoUrl"
-            defaultValue={store.logoUrl ?? ""}
-            placeholder="https://din-butik.se/logo.png"
-          />
-          <p className="text-xs leading-5 text-zinc-500">
-            Tips: Använd en publik bild-URL (PNG/JPG). Loggan visas högst upp i mailet.
-          </p>
-          <Textarea
-            label="Butiksadress (för karta i mail)"
-            name="address"
-            defaultValue={store.address ?? ""}
-            placeholder="Storgatan 1, 123 45 Stockholm"
-          />
-          <p className="text-xs leading-5 text-zinc-500">
-            Adressen skapar en klickbar Google Maps-karta i bekräftelsemailet till kunden.
-            Produktbild och info i upphämtningsmail hämtas från produktkatalogen.
-          </p>
-        </SettingsCard>
+          <div className={activeSection === "butik" ? "flex flex-col gap-4" : "hidden"}>
+            <SettingsCard
+              title="Butik & upphämtningsmail"
+              description="Logo och adress visas i mailet när ordern är redo. Adressen används för Google Maps-kartan."
+            >
+              <Field
+                label="Butiksnamn"
+                name="name"
+                defaultValue={store.name}
+                placeholder="t.ex. Demo Butik"
+                hint="Visas i appen, på kvitton och i upphämtningsmail."
+              />
+              <Field
+                label="Logo URL (direkt länk till bild)"
+                name="logoUrl"
+                defaultValue={store.logoUrl ?? ""}
+                placeholder="https://din-butik.se/logo.png"
+                hint="Publik bild-URL (PNG/JPG). Loggan visas högst upp i upphämtningsmailet."
+              />
+              <Textarea
+                label="Butiksadress (för karta i mail)"
+                name="address"
+                defaultValue={store.address ?? ""}
+                placeholder="Storgatan 1, 123 45 Stockholm"
+                hint="Skapar en klickbar Google Maps-karta i bekräftelsemailet till kunden."
+              />
+            </SettingsCard>
+          </div>
 
-        <SettingsCard
-          title="Kvitto"
-          description="Texter och format som används när kvittot skrivs ut."
-        >
-          <Field
-            label="Kvittobredd (mm)"
-            name="receiptWidthMm"
-            type="number"
-            min="58"
-            max="112"
-            defaultValue={store.receiptWidthMm}
-          />
-          <Textarea
-            label="Tackmeddelande"
-            name="thankYouMessage"
-            defaultValue={store.thankYouMessage ?? ""}
-          />
-          <Textarea
-            label="Footer-text"
-            name="receiptFooter"
-            defaultValue={store.receiptFooter ?? ""}
-          />
-          <Textarea
-            label="Returtext"
-            name="returnText"
-            defaultValue={store.returnText ?? ""}
-          />
-          <Textarea
-            label="Sociala medier"
-            name="socialLinks"
-            defaultValue={store.socialLinks ?? ""}
-          />
-        </SettingsCard>
+          <div
+            className={activeSection === "woocommerce" ? "flex flex-col gap-4" : "hidden"}
+          >
+            <IntegrationCard
+              store={store}
+              webhookMode={webhookMode}
+              webhookSecret={webhookSecret}
+              webhookUrls={webhookUrls}
+              copied={copied}
+              onGenerateSecret={generateWebhookSecret}
+              onWebhookSecretChange={setWebhookSecret}
+              onCopy={copyToClipboard}
+            />
+          </div>
 
-        {error ? <Alert type="error" message={error} /> : null}
-        {success ? <Alert type="success" message="Inställningarna sparades." /> : null}
+          <div className={activeSection === "epost" ? "flex flex-col gap-4" : "hidden"}>
+            <SmtpSettingsCard
+              store={store}
+              testEmail={testEmail}
+              testingEmail={testingEmail}
+              onTestEmailChange={setTestEmail}
+              onSendTestEmail={sendTestEmail}
+            />
+          </div>
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="min-h-12 cursor-pointer rounded-2xl bg-accent px-4 text-sm font-bold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
-        >
-          {saving ? "Sparar..." : "Spara inställningar"}
-        </button>
-      </form>
+          <div className={activeSection === "kvitto" ? "flex flex-col gap-4" : "hidden"}>
+            <SettingsCard
+              title="Kvitto"
+              description="Texter och format som används när kvittot skrivs ut."
+            >
+              <Field
+                label="Kvittobredd (mm)"
+                name="receiptWidthMm"
+                type="number"
+                min="58"
+                max="112"
+                defaultValue={store.receiptWidthMm}
+                placeholder="80"
+                hint="Vanligt 58 eller 80 mm för termoskrivare."
+              />
+              <Textarea
+                label="Tackmeddelande"
+                name="thankYouMessage"
+                defaultValue={store.thankYouMessage ?? ""}
+                placeholder="Tack för ditt köp!"
+                hint="Visas högst upp på kvittot efter köpet."
+              />
+              <Textarea
+                label="Footer-text"
+                name="receiptFooter"
+                defaultValue={store.receiptFooter ?? ""}
+                placeholder="Öppet mån–fre 10–18"
+                hint="Extra information längst ner på kvittot."
+              />
+              <Textarea
+                label="Returtext"
+                name="returnText"
+                defaultValue={store.returnText ?? ""}
+                placeholder="14 dagars öppet köp med kvitto"
+                hint="Retur- och bytespolicy som skrivs ut på kvittot."
+              />
+              <Textarea
+                label="Sociala medier"
+                name="socialLinks"
+                defaultValue={store.socialLinks ?? ""}
+                placeholder="Instagram: @butik · Facebook: /butik"
+                hint="Valfria länkar eller handtag som visas på kvittot."
+              />
+            </SettingsCard>
+          </div>
+
+          <div className="sticky bottom-20 z-20 rounded-2xl border border-zinc-200/80 bg-white/95 p-3 shadow-lg backdrop-blur lg:bottom-4">
+            <p className="mb-2 text-center text-[11px] font-semibold text-zinc-500 lg:text-left">
+              Sparar alla fält oavsett vilken flik du står på.
+            </p>
+            <button
+              type="submit"
+              disabled={saving}
+              className="min-h-12 w-full cursor-pointer rounded-2xl bg-accent px-4 text-sm font-bold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
+            >
+              {saving ? "Sparar..." : "Spara inställningar"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
+}
+
+function SettingsSectionNav({
+  activeSection,
+  activeDescription,
+  onSelect,
+}: {
+  activeSection: SettingsSectionId;
+  activeDescription: string;
+  onSelect: (sectionId: SettingsSectionId) => void;
+}) {
+  const activeStyle = SECTION_STYLES[activeSection];
+
+  return (
+    <nav aria-label="Inställningssektioner">
+      <div className="overflow-hidden rounded-[1.75rem] border border-zinc-200/80 bg-white shadow-sm">
+        <div className="hidden border-b border-zinc-100 px-5 py-3 lg:block">
+          <p className="text-sm font-bold text-zinc-950">Vad vill du göra?</p>
+          <p className="mt-0.5 text-xs leading-5 text-zinc-500">
+            Välj ett område att konfigurera.
+          </p>
+        </div>
+
+        <ul className="grid grid-cols-2 gap-2 p-2 lg:flex lg:gap-1.5 lg:p-2">
+          {SETTINGS_SECTIONS.map((section) => {
+            const active = section.id === activeSection;
+            const style = SECTION_STYLES[section.id];
+
+            return (
+              <li key={section.id} className="min-w-0 lg:flex-1">
+                <button
+                  type="button"
+                  onClick={() => onSelect(section.id)}
+                  aria-current={active ? "page" : undefined}
+                  className={`group flex w-full cursor-pointer rounded-2xl border text-left transition duration-200 ${
+                    active
+                      ? `${style.activeSurface} ${style.activeBorder}`
+                      : "border-transparent bg-zinc-50/80 hover:border-zinc-200 hover:bg-white lg:bg-transparent"
+                  }`}
+                >
+                  <span className="flex min-h-[5.5rem] w-full flex-col items-center gap-2 p-3 text-center lg:min-h-0 lg:flex-row lg:justify-center lg:gap-2.5 lg:px-3 lg:py-3">
+                    <span
+                      className={`flex size-10 shrink-0 items-center justify-center rounded-2xl transition lg:size-9 ${
+                        active ? style.iconActive : style.icon
+                      }`}
+                    >
+                      <SettingsSectionIcon section={section.id} />
+                    </span>
+                    <span className="min-w-0">
+                      <span
+                        className={`block text-sm font-bold leading-tight ${
+                          active ? style.title : "text-zinc-900"
+                        }`}
+                      >
+                        {section.label}
+                      </span>
+                      <span className="mt-1 block text-[11px] font-medium leading-4 text-zinc-500 lg:hidden">
+                        {section.shortHint}
+                      </span>
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+
+        <p
+          className={`hidden border-t px-5 py-3 text-sm leading-6 lg:block ${activeStyle.mobileHeader} border-zinc-100/80 text-zinc-600`}
+        >
+          {activeDescription}
+        </p>
+      </div>
+    </nav>
+  );
+}
+
+function SettingsSectionIcon({ section }: { section: SettingsSectionId }) {
+  const className = "size-5";
+
+  switch (section) {
+    case "butik":
+      return (
+        <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden>
+          <path
+            d="M3.5 8.5 10 3.5l6.5 5v7.5a1 1 0 0 1-1 1h-4v-5H8.5v5h-4a1 1 0 0 1-1-1V8.5Z"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
+    case "woocommerce":
+      return (
+        <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden>
+          <path
+            d="M4 5.5h12M4 10h12M4 14.5h7"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+          <circle cx="14.5" cy="14.5" r="2" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      );
+    case "epost":
+      return (
+        <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden>
+          <rect
+            x="2.5"
+            y="4.5"
+            width="15"
+            height="11"
+            rx="2"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          />
+          <path
+            d="m3.5 6.5 6.5 4.5 6.5-4.5"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
+    case "kvitto":
+      return (
+        <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden>
+          <path
+            d="M5.5 3.5h9a1 1 0 0 1 1 1v11.5l-2.25-1.25L10.5 16l-2.75-1.25L5.5 16V4.5a1 1 0 0 1 1-1Z"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M8 8h4M8 11h4"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
+      );
+  }
 }
 
 function IntegrationCard({
@@ -362,15 +679,14 @@ function IntegrationCard({
   onWebhookSecretChange: (value: string) => void;
   onCopy: (id: string, value: string) => void;
 }) {
+  const toast = useToast();
   const isTestMode = webhookMode === "test";
   const [fetchedJson, setFetchedJson] = useState("");
   const [fetchingJson, setFetchingJson] = useState(false);
-  const [fetchJsonError, setFetchJsonError] = useState<string | null>(null);
   const [jsonCopied, setJsonCopied] = useState(false);
 
   async function handleFetchLatestJson() {
     setFetchingJson(true);
-    setFetchJsonError(null);
     setJsonCopied(false);
 
     try {
@@ -383,13 +699,13 @@ function IntegrationCard({
       };
 
       if (!response.ok) {
-        setFetchJsonError(data.error ?? "Kunde inte hämta JSON");
+        toast.error(data.error ?? "Kunde inte hämta JSON");
         return;
       }
 
       setFetchedJson(data.jsonText ?? formatWooJsonForEditor([]));
     } catch {
-      setFetchJsonError("Något gick fel. Försök igen.");
+      toast.error("Något gick fel. Försök igen.");
     } finally {
       setFetchingJson(false);
     }
@@ -405,7 +721,7 @@ function IntegrationCard({
       setJsonCopied(true);
       window.setTimeout(() => setJsonCopied(false), 2000);
     } catch {
-      setFetchJsonError("Kunde inte kopiera");
+      toast.error("Kunde inte kopiera");
     }
   }
 
@@ -462,16 +778,19 @@ function IntegrationCard({
             type="url"
             defaultValue={store.wooUrl ?? ""}
             placeholder="https://dinbutik.se"
+            hint="Butikens WooCommerce-adress utan /wp-admin."
           />
           <Field
             label={`Consumer Key${store.wooConsumerKey ? " · installerad" : " · inte installerad"}`}
             name="wooConsumerKey"
-            placeholder="Lämna tomt för att behålla"
+            placeholder="ck_xxxxxxxxxxxxxxxx"
+            hint="Lämna tomt för att behålla sparad nyckel."
           />
           <Field
             label={`Consumer Secret${store.wooConsumerSecret ? " · installerad" : " · inte installerad"}`}
             name="wooConsumerSecret"
-            placeholder="Lämna tomt för att behålla"
+            placeholder="cs_xxxxxxxxxxxxxxxx"
+            hint="Lämna tomt för att behålla sparad hemlighet."
           />
           <div className="grid grid-cols-[1fr_auto] items-end gap-2">
             <Field
@@ -479,7 +798,8 @@ function IntegrationCard({
               name="wooWebhookSecret"
               value={webhookSecret}
               onChangeValue={onWebhookSecretChange}
-              placeholder="Lämna tomt för att behålla"
+              placeholder="Generera eller klistra in"
+              hint="Samma secret används på båda webhooks i WooCommerce."
             />
             <button
               type="button"
@@ -559,12 +879,6 @@ function IntegrationCard({
               </button>
             </>
           ) : null}
-
-          {fetchJsonError ? (
-            <p className="mt-2 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-700">
-              {fetchJsonError}
-            </p>
-          ) : null}
         </div>
       </div>
     </section>
@@ -575,14 +889,12 @@ function SmtpSettingsCard({
   store,
   testEmail,
   testingEmail,
-  testEmailResult,
   onTestEmailChange,
   onSendTestEmail,
 }: {
   store: EditableStore;
   testEmail: string;
   testingEmail: boolean;
-  testEmailResult: string | null;
   onTestEmailChange: (value: string) => void;
   onSendTestEmail: () => void;
 }) {
@@ -607,6 +919,7 @@ function SmtpSettingsCard({
             name="smtpHost"
             defaultValue={store.smtpHost ?? ""}
             placeholder="smtp.gmail.com"
+            hint="Servern som skickar e-post, t.ex. smtp.gmail.com."
           />
           <Field
             label="SMTP port"
@@ -614,6 +927,7 @@ function SmtpSettingsCard({
             type="number"
             defaultValue={store.smtpPort ?? 587}
             placeholder="587"
+            hint="Vanligt 587 (TLS) eller 465 (SSL)."
           />
           <label className="mt-2 flex min-h-12 cursor-pointer items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-700">
             <input
@@ -627,19 +941,22 @@ function SmtpSettingsCard({
           <Field
             label={`SMTP användare${store.smtpUser ? " · installerad" : ""}`}
             name="smtpUser"
-            placeholder="Lämna tomt för att behålla sparad användare"
+            placeholder="din-mail@example.com"
+            hint="Lämna tomt för att behålla sparad användare."
           />
           <Field
             label={`SMTP lösenord${store.smtpPass ? " · installerad" : ""}`}
             name="smtpPass"
             type="password"
-            placeholder="Lämna tomt för att behålla sparat lösenord"
+            placeholder="••••••••"
+            hint="Lämna tomt för att behålla sparat lösenord."
           />
           <Field
             label="Avsändare"
             name="smtpFrom"
             defaultValue={store.smtpFrom ?? ""}
             placeholder="POS Demo <din-mail@example.com>"
+            hint="Namn och e-post som mottagaren ser som avsändare."
           />
         </div>
 
@@ -651,12 +968,8 @@ function SmtpSettingsCard({
             value={testEmail}
             onChangeValue={onTestEmailChange}
             placeholder="din-mail@example.com"
+            hint="Kontrollera att SMTP-inställningarna fungerar innan du går live."
           />
-          {testEmailResult ? (
-            <p className="mt-2 rounded-2xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
-              {testEmailResult}
-            </p>
-          ) : null}
           <button
             type="button"
             disabled={testingEmail || testEmail.trim().length === 0}
@@ -701,6 +1014,7 @@ function Field({
   min,
   max,
   placeholder,
+  hint,
 }: {
   label: string;
   name: string;
@@ -711,7 +1025,11 @@ function Field({
   min?: string;
   max?: string;
   placeholder?: string;
+  hint?: string;
 }) {
+  const generatedId = useId();
+  const inputId = `${name}-${generatedId}`;
+  const hintId = hint ? `${inputId}-hint` : undefined;
   const controlledProps =
     value !== undefined
       ? {
@@ -722,17 +1040,24 @@ function Field({
       : { defaultValue };
 
   return (
-    <label className="flex flex-col gap-1 text-sm font-semibold text-zinc-700">
+    <label htmlFor={inputId} className="flex flex-col gap-1 text-sm font-semibold text-zinc-700">
       {label}
       <input
+        id={inputId}
         name={name}
         type={type}
         min={min}
         max={max}
         placeholder={placeholder}
+        aria-describedby={hintId}
         {...controlledProps}
-        className="min-h-12 cursor-text rounded-2xl border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
+        className="min-h-12 cursor-text rounded-2xl border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
       />
+      {hint ? (
+        <span id={hintId} className="text-xs font-normal leading-5 text-zinc-500">
+          {hint}
+        </span>
+      ) : null}
     </label>
   );
 }
@@ -742,38 +1067,37 @@ function Textarea({
   name,
   defaultValue,
   placeholder,
+  hint,
 }: {
   label: string;
   name: string;
   defaultValue?: string;
   placeholder?: string;
+  hint?: string;
 }) {
+  const generatedId = useId();
+  const inputId = `${name}-${generatedId}`;
+  const hintId = hint ? `${inputId}-hint` : undefined;
+
   return (
-    <label className="flex flex-col gap-1 text-sm font-semibold text-zinc-700">
+    <label htmlFor={inputId} className="flex flex-col gap-1 text-sm font-semibold text-zinc-700">
       {label}
       <textarea
+        id={inputId}
         name={name}
         defaultValue={defaultValue}
         placeholder={placeholder}
+        aria-describedby={hintId}
         rows={3}
-        className="min-h-24 cursor-text resize-y rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
+        className="min-h-24 cursor-text resize-y rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-base font-normal text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
       />
+      {hint ? (
+        <span id={hintId} className="text-xs font-normal leading-5 text-zinc-500">
+          {hint}
+        </span>
+      ) : null}
     </label>
   );
-}
-
-function Alert({
-  type,
-  message,
-}: {
-  type: "error" | "success";
-  message: string;
-}) {
-  const styles =
-    type === "error"
-      ? "bg-red-50 text-red-700"
-      : "bg-emerald-50 text-emerald-700";
-  return <p className={`rounded-2xl px-3 py-2 text-sm ${styles}`}>{message}</p>;
 }
 
 function randomSecret(): string {

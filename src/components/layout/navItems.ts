@@ -26,14 +26,14 @@ const adminNav: NavItem[] = [
   {
     href: "/admin/dashboard",
     label: "Dashboard",
-    shortLabel: "Dash",
+    shortLabel: "Dashboard",
     icon: "D",
   },
   { href: "/kassa", label: "Kassa", shortLabel: "Kassa", icon: "K" },
   {
     href: "/admin/products",
     label: "Produkter",
-    shortLabel: "Prod",
+    shortLabel: "Produkter",
     icon: "P",
   },
   { href: "/sok", label: "Sök", shortLabel: "Sök", icon: "S" },

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useToast } from "@/components/ui/ToastProvider";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -16,8 +17,8 @@ export function ProductActions({
   showEditLink = true,
 }: ProductActionsProps) {
   const router = useRouter();
+  const toast = useToast();
   const [deleting, setDeleting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   async function handleDelete() {
     const confirmed = window.confirm(
@@ -29,7 +30,6 @@ export function ProductActions({
     }
 
     setDeleting(true);
-    setError(null);
 
     try {
       const response = await fetch(`/api/products/${productId}`, {
@@ -38,14 +38,14 @@ export function ProductActions({
 
       if (!response.ok) {
         const data = (await response.json()) as { error?: string };
-        setError(data.error ?? "Kunde inte ta bort produkten");
+        toast.error(data.error ?? "Kunde inte ta bort produkten");
         return;
       }
 
       router.push("/admin/products");
       router.refresh();
     } catch {
-      setError("Något gick fel. Försök igen.");
+      toast.error("Något gick fel. Försök igen.");
     } finally {
       setDeleting(false);
     }
@@ -71,11 +71,6 @@ export function ProductActions({
           {deleting ? "Tar bort..." : "Ta bort"}
         </button>
       </div>
-      {error ? (
-        <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }

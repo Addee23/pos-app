@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { notifyPickupReady } from "@/lib/pickup-notifications";
 import { prisma } from "@/lib/prisma";
-import { isAdmin } from "@/lib/rbac";
+import { isAdmin } from "../../../../../../rbac";
 import { rateLimit } from "@/lib/rate-limit";
 
 type RouteParams = {

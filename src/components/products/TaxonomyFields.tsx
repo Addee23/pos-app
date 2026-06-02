@@ -24,6 +24,7 @@ export function TaxonomyFields({
         options={taxonomySelectOptions(PRODUCT_CATEGORIES, category)}
         defaultValue={category ?? ""}
         emptyLabel="Välj kategori"
+        hint="Hjälper filtrering i katalog och rapporter."
       />
       <TaxonomySelect
         label="Varumärke"
@@ -31,6 +32,7 @@ export function TaxonomyFields({
         options={taxonomySelectOptions(PRODUCT_BRANDS, brand)}
         defaultValue={brand ?? ""}
         emptyLabel="Välj varumärke"
+        hint="Producent eller varumärke."
       />
       <TaxonomySelect
         label="Ursprungsland"
@@ -38,6 +40,7 @@ export function TaxonomyFields({
         options={taxonomySelectOptions(PRODUCT_COUNTRIES, country)}
         defaultValue={country ?? ""}
         emptyLabel="Välj land"
+        hint="Land där produkten tillverkas."
       />
     </div>
   );
@@ -49,20 +52,27 @@ function TaxonomySelect({
   options,
   defaultValue,
   emptyLabel,
+  hint,
 }: {
   label: string;
   name: string;
   options: string[];
   defaultValue: string;
   emptyLabel: string;
+  hint?: string;
 }) {
+  const selectId = `${name}-taxonomy`;
+  const hintId = hint ? `${selectId}-hint` : undefined;
+
   return (
-    <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+    <label htmlFor={selectId} className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
       {label}
       <div className="relative">
         <select
+          id={selectId}
           name={name}
           defaultValue={defaultValue}
+          aria-describedby={hintId}
           className="min-h-11 w-full cursor-pointer appearance-none rounded-lg border border-zinc-200 bg-white py-2 pl-3 pr-9 text-sm font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
         >
           <option value="">{emptyLabel}</option>
@@ -79,6 +89,11 @@ function TaxonomySelect({
           ▾
         </span>
       </div>
+      {hint ? (
+        <span id={hintId} className="text-xs font-normal leading-5 text-zinc-500">
+          {hint}
+        </span>
+      ) : null}
     </label>
   );
 }

@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { variantUpdateSchema } from "@/lib/validations/product";
 import { rateLimit } from "@/lib/rate-limit";
-import { isAdmin } from "@/lib/rbac";
+import { isAdmin } from "../../../../../../../rbac";
 import { createAuditLog } from "@/lib/audit";
 
 type RouteContext = {

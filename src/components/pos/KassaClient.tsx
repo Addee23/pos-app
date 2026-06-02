@@ -1,5 +1,6 @@
 "use client";
 
+import { useToast } from "@/components/ui/ToastProvider";
 import { useState } from "react";
 
 export type PosStore = {
@@ -69,14 +70,13 @@ type KassaClientProps = {
 };
 
 export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
+  const toast = useToast();
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchItem[]>([]);
   const [resultPopupOpen, setResultPopupOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const total = cart.reduce(
@@ -87,13 +87,11 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
   async function searchProducts(formData: FormData) {
     const nextQuery = String(formData.get("q") ?? "").trim();
     setQuery(nextQuery);
-    setError(null);
-    setSuccess(null);
     setSearchResults([]);
     setResultPopupOpen(false);
 
     if (!nextQuery) {
-      setError("Skriv eller scanna en produktkod.");
+      toast.error("Skriv eller scanna en produktkod.");
       return;
     }
 
@@ -105,7 +103,7 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
       );
 
       if (!response.ok) {
-        setError(await getErrorMessage(response, "Kunde inte söka produkt"));
+        toast.error(await getErrorMessage(response, "Kunde inte söka produkt"));
         return;
       }
 
@@ -114,12 +112,12 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
       if (data.exactMatch) {
         addSearchItem(data.exactMatch);
         setQuery("");
-        setSuccess(`${displayName(data.exactMatch)} lades till i varukorgen.`);
+        toast.success(`${displayName(data.exactMatch)} lades till i varukorgen.`);
         return;
       }
 
       if (data.results.length === 0) {
-        setError("Ingen produkt hittades.");
+        toast.error("Ingen produkt hittades.");
         return;
       }
 
@@ -127,7 +125,7 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
       setResultPopupOpen(true);
     } catch (error) {
       console.error(error);
-      setError("Något gick fel vid sökningen. Försök igen.");
+      toast.error("Något gick fel vid sökningen. Försök igen.");
     } finally {
       setSearching(false);
     }
@@ -151,11 +149,8 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
   }
 
   function addToCart(nextItem: CartItem) {
-    setError(null);
-    setSuccess(null);
-
     if (nextItem.maxQuantity <= 0) {
-      setError("Varan saknar lager och kan inte läggas till.");
+      toast.error("Varan saknar lager och kan inte läggas till.");
       return;
     }
 
@@ -169,7 +164,7 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
       }
 
       if (existing.quantity >= existing.maxQuantity) {
-        setError("Det finns inte fler i lager.");
+        toast.error("Det finns inte fler i lager.");
         return currentCart;
       }
 
@@ -195,17 +190,12 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
     }
 
     setCart([]);
-    setError(null);
-    setSuccess(null);
     setSearchResults([]);
     setResultPopupOpen(false);
-    setSuccess("Köpet avbröts och varukorgen tömdes.");
+    toast.success("Köpet avbröts och varukorgen tömdes.");
   }
 
   function changeQuantity(cartKey: string, change: number) {
-    setError(null);
-    setSuccess(null);
-
     setCart((currentCart) =>
       currentCart.flatMap((item) => {
         if (item.cartKey !== cartKey) {
@@ -218,7 +208,7 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
         }
 
         if (nextQuantity > item.maxQuantity) {
-          setError("Det finns inte fler i lager.");
+          toast.error("Det finns inte fler i lager.");
           return [item];
         }
 
@@ -228,11 +218,8 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
   }
 
   async function completeSale() {
-    setError(null);
-    setSuccess(null);
-
     if (cart.length === 0) {
-      setError("Lägg till minst en vara innan du slutför köpet.");
+      toast.error("Lägg till minst en vara innan du slutför köpet.");
       return;
     }
 
@@ -252,7 +239,7 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
       });
 
       if (!response.ok) {
-        setError(await getErrorMessage(response, "Kunde inte slutföra köpet"));
+        toast.error(await getErrorMessage(response, "Kunde inte slutföra köpet"));
         return;
       }
 
@@ -268,17 +255,17 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
       setQuery("");
       setSearchResults([]);
       setResultPopupOpen(false);
-      setSuccess("Köpet slutfördes och lagret uppdaterades.");
+      toast.success("Köpet slutfördes och lagret uppdaterades.");
     } catch (error) {
       console.error(error);
-      setError("Något gick fel vid anropet. Försök igen.");
+      toast.error("Något gick fel vid anropet. Försök igen.");
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:items-start lg:gap-6">
       <section className="flex flex-col gap-4">
         <div className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
@@ -296,17 +283,22 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
           action={searchProducts}
           className="sticky top-[73px] z-30 flex flex-col gap-3 rounded-3xl border border-zinc-200 bg-white/95 p-3 text-sm font-medium text-zinc-700 shadow-sm backdrop-blur"
         >
-          <label className="flex flex-col gap-1">
+          <label htmlFor="kassa-search" className="flex flex-col gap-1">
             Sök eller scanna
             <input
+              id="kassa-search"
               name="q"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               type="search"
               placeholder="EAN, produktnamn eller WooCommerce-länk"
               autoComplete="off"
-              className="min-h-12 w-full cursor-text rounded-2xl border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
+              aria-describedby="kassa-search-hint"
+              className="min-h-12 w-full cursor-text rounded-2xl border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
             />
+            <span id="kassa-search-hint" className="text-xs font-normal leading-5 text-zinc-500">
+              Skanna streckkod eller skriv produktnamn. Klistra in Woo-länk för att hitta via URL.
+            </span>
           </label>
           <button
             type="submit"
@@ -318,11 +310,10 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
         </form>
       </section>
 
+      <div className="flex flex-col gap-4 lg:sticky lg:top-24">
       <CartPanel
         cart={cart}
         total={total}
-        error={error}
-        success={success}
         saving={saving}
         isAdmin={isAdmin}
         onChangeQuantity={changeQuantity}
@@ -331,6 +322,7 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
       />
 
       {receipt ? <ReceiptPanel receipt={receipt} store={store} /> : null}
+      </div>
 
       {resultPopupOpen ? (
         <SearchResultPopup
@@ -340,7 +332,7 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
             addSearchItem(item);
             setResultPopupOpen(false);
             setQuery("");
-            setSuccess(`${displayName(item)} lades till i varukorgen.`);
+            toast.success(`${displayName(item)} lades till i varukorgen.`);
           }}
         />
       ) : null}
@@ -360,8 +352,8 @@ function SearchResultPopup({
   const groupedResults = groupSearchResults(results);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-zinc-950/35 px-3 pb-3 pt-10">
-      <section className="max-h-[88vh] w-full max-w-[430px] overflow-y-auto rounded-[2rem] bg-[#f3eee5] p-4 shadow-2xl">
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-zinc-950/35 px-3 pb-3 pt-10 lg:items-center lg:p-6">
+      <section className="max-h-[88vh] w-full max-w-[430px] overflow-y-auto rounded-[2rem] bg-[#f3eee5] p-4 shadow-2xl lg:max-w-xl">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-orange-600">
@@ -580,8 +572,6 @@ function itemKey(item: SearchItem): string {
 function CartPanel({
   cart,
   total,
-  error,
-  success,
   saving,
   isAdmin,
   onChangeQuantity,
@@ -590,8 +580,6 @@ function CartPanel({
 }: {
   cart: CartItem[];
   total: number;
-  error: string | null;
-  success: string | null;
   saving: boolean;
   isAdmin: boolean;
   onChangeQuantity: (cartKey: string, change: number) => void;
@@ -673,9 +661,6 @@ function CartPanel({
           </p>
         </div>
 
-        {error ? <Alert type="error" message={error} /> : null}
-        {success ? <Alert type="success" message={success} /> : null}
-
         <div className="mt-4 flex flex-col gap-2">
           {isAdmin && cart.length > 0 ? (
             <button
@@ -699,20 +684,6 @@ function CartPanel({
       </section>
     </aside>
   );
-}
-
-function Alert({
-  type,
-  message,
-}: {
-  type: "error" | "success";
-  message: string;
-}) {
-  const styles =
-    type === "error"
-      ? "mt-3 bg-red-50 text-red-700"
-      : "mt-3 bg-emerald-50 text-emerald-700";
-  return <p className={`rounded-2xl px-3 py-2 text-sm ${styles}`}>{message}</p>;
 }
 
 function ReceiptPanel({
