@@ -249,11 +249,13 @@ export function ProductSearch({
           </span>
           <input
             ref={inputRef}
+            id="product-search"
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleSearchKeyDown}
             placeholder="Namn, EAN, slug eller länk…"
+            aria-describedby="product-search-hint"
             className="h-11 w-full rounded-xl bg-zinc-100/80 py-2 pl-10 pr-9 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:bg-white focus:ring-2 focus:ring-zinc-200/80"
           />
           {query ? (
@@ -297,6 +299,10 @@ export function ProductSearch({
         </button>
       </div>
 
+      <p id="product-search-hint" className="text-[11px] leading-5 text-zinc-500">
+        Sök på produktnamn, EAN, slug eller klistra in WooCommerce-länk.
+      </p>
+
       {submitOnButtonOnly ? (
         <p className="text-[11px] text-zinc-500">
           Välj filter och tryck <span className="font-semibold">Sök</span> för att
@@ -304,92 +310,91 @@ export function ProductSearch({
         </p>
       ) : null}
 
-      {filterOptions.categories.length > 0 ? (
-        <FilterRow label="Kategori">
-          {filterOptions.categories.map((category) => (
-            <FilterChip
-              key={category}
-              label={category}
-              selected={chipFilters.category === category}
-              pending={pending}
-              onClick={() =>
-                submitOnButtonOnly
-                  ? toggleDraft("category", category)
-                  : toggleParam("category", category, initialCategory)
-              }
-            />
-          ))}
-        </FilterRow>
-      ) : null}
+      {filtersOpen ? (
+        <div className="space-y-3 rounded-xl border border-zinc-100 bg-zinc-50/80 p-3">
+          {filterOptions.categories.length > 0 ? (
+            <FilterRow label="Kategori">
+              {filterOptions.categories.map((category) => (
+                <FilterChip
+                  key={category}
+                  label={category}
+                  selected={chipFilters.category === category}
+                  pending={pending}
+                  onClick={() =>
+                    submitOnButtonOnly
+                      ? toggleDraft("category", category)
+                      : toggleParam("category", category, initialCategory)
+                  }
+                />
+              ))}
+            </FilterRow>
+          ) : null}
 
-      {filterOptions.brands.length > 0 ? (
-        <FilterRow label="Varumärke">
-          {filterOptions.brands.map((brand) => (
-            <FilterChip
-              key={brand}
-              label={brand}
-              selected={chipFilters.brand === brand}
-              pending={pending}
-              onClick={() =>
-                submitOnButtonOnly
-                  ? toggleDraft("brand", brand)
-                  : toggleParam("brand", brand, initialBrand)
-              }
-              accent="violet"
-            />
-          ))}
-        </FilterRow>
-      ) : null}
+          {filterOptions.brands.length > 0 ? (
+            <FilterRow label="Varumärke">
+              {filterOptions.brands.map((brand) => (
+                <FilterChip
+                  key={brand}
+                  label={brand}
+                  selected={chipFilters.brand === brand}
+                  pending={pending}
+                  onClick={() =>
+                    submitOnButtonOnly
+                      ? toggleDraft("brand", brand)
+                      : toggleParam("brand", brand, initialBrand)
+                  }
+                  accent="violet"
+                />
+              ))}
+            </FilterRow>
+          ) : null}
 
-      {filterOptions.countries.length > 0 ? (
-        <FilterRow label="Land">
-          {filterOptions.countries.map((country) => (
-            <FilterChip
-              key={country}
-              label={country}
-              selected={chipFilters.country === country}
-              pending={pending}
-              onClick={() =>
-                submitOnButtonOnly
-                  ? toggleDraft("country", country)
-                  : toggleParam("country", country, initialCountry)
-              }
-              accent="blue"
-            />
-          ))}
-        </FilterRow>
-      ) : null}
+          {filterOptions.countries.length > 0 ? (
+            <FilterRow label="Land">
+              {filterOptions.countries.map((country) => (
+                <FilterChip
+                  key={country}
+                  label={country}
+                  selected={chipFilters.country === country}
+                  pending={pending}
+                  onClick={() =>
+                    submitOnButtonOnly
+                      ? toggleDraft("country", country)
+                      : toggleParam("country", country, initialCountry)
+                  }
+                  accent="blue"
+                />
+              ))}
+            </FilterRow>
+          ) : null}
 
-      {filtersOpen && showStoreFilter && stores.length > 0 ? (
-        <div className="rounded-xl border border-zinc-100 bg-zinc-50/80 p-3">
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-zinc-400">
-            Butik
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <FilterChip
-              label="Alla butiker"
-              selected={!chipFilters.storeId}
-              pending={pending}
-              onClick={() =>
-                submitOnButtonOnly
-                  ? setDraft((current) => ({ ...current, storeId: "" }))
-                  : navigate({ storeId: null })
-              }
-            />
-            {stores.map((store) => (
+          {showStoreFilter && stores.length > 0 ? (
+            <FilterRow label="Butik">
               <FilterChip
-                key={store.id}
-                label={store.name}
-                selected={chipFilters.storeId === store.id}
+                label="Alla butiker"
+                selected={!chipFilters.storeId}
                 pending={pending}
                 onClick={() =>
                   submitOnButtonOnly
-                    ? toggleDraft("storeId", store.id)
-                    : toggleParam("storeId", store.id, initialStoreId)
+                    ? setDraft((current) => ({ ...current, storeId: "" }))
+                    : navigate({ storeId: null })
                 }
               />
-            ))}
-          </div>
+              {stores.map((store) => (
+                <FilterChip
+                  key={store.id}
+                  label={store.name}
+                  selected={chipFilters.storeId === store.id}
+                  pending={pending}
+                  onClick={() =>
+                    submitOnButtonOnly
+                      ? toggleDraft("storeId", store.id)
+                      : toggleParam("storeId", store.id, initialStoreId)
+                  }
+                />
+              ))}
+            </FilterRow>
+          ) : null}
         </div>
       ) : null}
 

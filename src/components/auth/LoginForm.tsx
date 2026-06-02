@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { InputField } from "@/components/ui/FormField";
+import { useToast } from "@/components/ui/ToastProvider";
+import { useActionState, useEffect } from "react";
 import { loginAction, type LoginState } from "@/app/login/actions";
 
 const initialState: LoginState = {};
@@ -10,27 +12,41 @@ type LoginFormProps = {
 };
 
 export function LoginForm({ callbackUrl = "/" }: LoginFormProps) {
+  const toast = useToast();
   const [state, formAction, pending] = useActionState(loginAction, initialState);
+
+  useEffect(() => {
+    if (state.error) {
+      toast.error(state.error);
+    }
+  }, [state.error, toast]);
 
   return (
     <form action={formAction} className="flex w-full flex-col gap-4">
       <input type="hidden" name="callbackUrl" value={callbackUrl} />
 
-      <FormField label="E-post" id="email" type="email" name="email" required autoComplete="email" />
-      <FormField
+      <InputField
+        label="E-post"
+        id="email"
+        type="email"
+        name="email"
+        required
+        autoComplete="email"
+        placeholder="admin@butik.se"
+        hint="Din e-postadress för inloggning."
+        inputClassName="rounded-lg"
+      />
+      <InputField
         label="Lösenord"
         id="password"
         type="password"
         name="password"
         required
         autoComplete="current-password"
+        placeholder="••••••••"
+        hint="Minst 8 tecken. Personal kan byta lösenord i profilen efter inloggning."
+        inputClassName="rounded-lg"
       />
-
-      {state.error ? (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
-          {state.error}
-        </p>
-      ) : null}
 
       <button
         type="submit"
@@ -40,19 +56,5 @@ export function LoginForm({ callbackUrl = "/" }: LoginFormProps) {
         {pending ? "Loggar in..." : "Logga in"}
       </button>
     </form>
-  );
-}
-
-function FormField(props: React.ComponentProps<"input"> & { label: string }) {
-  const { label, id, ...inputProps } = props;
-  return (
-    <label htmlFor={id} className="flex flex-col gap-1.5 text-sm font-medium text-zinc-700">
-      {label}
-      <input
-        id={id}
-        {...inputProps}
-        className="min-h-12 cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base text-zinc-900 outline-none ring-blue-500/10 transition focus:border-blue-300 focus:ring-2"
-      />
-    </label>
   );
 }

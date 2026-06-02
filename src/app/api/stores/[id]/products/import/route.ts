@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { importWooProductsForStore } from "@/lib/product-import";
 import { rateLimit } from "@/lib/rate-limit";
-import { isAdmin } from "@/lib/rbac";
+import { isAdmin } from "../../../../../../../rbac";
 
 type ImportRouteContext = {
   params: Promise<{ id: string }>;

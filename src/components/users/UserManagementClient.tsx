@@ -1,5 +1,6 @@
 "use client";
 
+import { useToast } from "@/components/ui/ToastProvider";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Role } from "@/generated/prisma/client";
@@ -31,16 +32,13 @@ export function UserManagementClient({
   currentUserId,
 }: UserManagementClientProps) {
   const router = useRouter();
+  const toast = useToast();
   const [users, setUsers] = useState(initialUsers);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
 
   async function createUser(formData: FormData) {
     setCreating(true);
-    setMessage(null);
-    setError(null);
 
     const body = {
       email: formData.get("email"),
@@ -60,16 +58,16 @@ export function UserManagementClient({
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error ?? "Kunde inte skapa användaren");
+        toast.error(data.error ?? "Kunde inte skapa användaren");
         return;
       }
 
       setUsers((currentUsers) => [...currentUsers, data]);
-      setMessage("Användaren skapades.");
+      toast.success("Användaren skapades.");
       router.refresh();
     } catch (error) {
       console.error(error);
-      setError("Något gick fel vid anropet. Försök igen.");
+      toast.error("Något gick fel vid anropet. Försök igen.");
     } finally {
       setCreating(false);
     }
@@ -77,8 +75,6 @@ export function UserManagementClient({
 
   async function updateUser(userId: string, formData: FormData) {
     setSavingUserId(userId);
-    setMessage(null);
-    setError(null);
 
     const body = {
       name: formData.get("name"),
@@ -96,18 +92,18 @@ export function UserManagementClient({
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error ?? "Kunde inte uppdatera användaren");
+        toast.error(data.error ?? "Kunde inte uppdatera användaren");
         return;
       }
 
       setUsers((currentUsers) =>
         currentUsers.map((user) => (user.id === data.id ? data : user)),
       );
-      setMessage("Användaren uppdaterades.");
+      toast.success("Användaren uppdaterades.");
       router.refresh();
     } catch (error) {
       console.error(error);
-      setError("Något gick fel vid anropet. Försök igen.");
+      toast.error("Något gick fel vid anropet. Försök igen.");
     } finally {
       setSavingUserId(null);
     }
@@ -128,13 +124,28 @@ export function UserManagementClient({
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Namn" name="name" autoComplete="name" />
-          <Field label="E-post" name="email" type="email" autoComplete="email" />
+          <Field
+            label="Namn"
+            name="name"
+            autoComplete="name"
+            placeholder="t.ex. Anna Andersson"
+            hint="Visas i appen och på kvitton."
+          />
+          <Field
+            label="E-post"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder="anna@butik.se"
+            hint="Används för inloggning. Kan inte ändras i efterhand."
+          />
           <Field
             label="Lösenord"
             name="password"
             type="password"
             autoComplete="new-password"
+            placeholder="Minst 8 tecken"
+            hint="Personal kan byta eget lösenord i profilen efter inloggning."
           />
           <RoleSelect name="role" defaultValue="PERSONAL" />
           <StoreSelect
@@ -152,9 +163,6 @@ export function UserManagementClient({
           {creating ? "Skapar..." : "Skapa användare"}
         </button>
       </form>
-
-      {message ? <Alert type="success" message={message} /> : null}
-      {error ? <Alert type="error" message={error} /> : null}
 
       <section className="flex flex-col gap-3">
         <div className="rounded-3xl border border-zinc-200/80 bg-white px-4 py-3 shadow-sm">
@@ -219,7 +227,12 @@ function UserCard({
         </span>
       </div>
       <div className="flex flex-col gap-4">
-        <Field label="Namn" name="name" defaultValue={user.name} />
+        <Field
+          label="Namn"
+          name="name"
+          defaultValue={user.name}
+          placeholder="t.ex. Anna Andersson"
+        />
         <ReadonlyField label="E-post" value={user.email} />
         <RoleSelect
           name="role"
@@ -253,6 +266,8 @@ function Field({
   defaultValue,
   type = "text",
   autoComplete,
+  placeholder,
+  hint,
   className = "",
 }: {
   label: string;
@@ -260,20 +275,34 @@ function Field({
   defaultValue?: string;
   type?: string;
   autoComplete?: string;
+  placeholder?: string;
+  hint?: string;
   className?: string;
 }) {
+  const inputId = `${name}-field`;
+  const hintId = hint ? `${inputId}-hint` : undefined;
+
   return (
     <label
+      htmlFor={inputId}
       className={`flex flex-col gap-1.5 text-sm font-medium text-zinc-700 ${className}`}
     >
       {label}
       <input
+        id={inputId}
         name={name}
         type={type}
         defaultValue={defaultValue}
         autoComplete={autoComplete}
-        className="min-h-12 w-full rounded-2xl border border-zinc-200 bg-white px-3.5 text-base font-normal text-zinc-900 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-500/10"
+        placeholder={placeholder}
+        aria-describedby={hintId}
+        className="min-h-12 w-full rounded-2xl border border-zinc-200 bg-white px-3.5 text-base font-normal text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-violet-300 focus:ring-2 focus:ring-violet-500/10"
       />
+      {hint ? (
+        <span id={hintId} className="text-xs font-normal leading-5 text-zinc-500">
+          {hint}
+        </span>
+      ) : null}
     </label>
   );
 }
@@ -312,6 +341,9 @@ function RoleSelect({
           <option value="PERSONAL">Personal</option>
           <option value="ADMIN">Admin</option>
         </select>
+        <span className="text-xs font-normal leading-5 text-zinc-500">
+          Admin har full åtkomst. Personal kan använda kassa och upphämtning.
+        </span>
       </label>
     </>
   );
@@ -342,23 +374,11 @@ function StoreSelect({
           </option>
         ))}
       </select>
+      <span className="text-xs font-normal leading-5 text-zinc-500">
+        Vilken butik användaren tillhör och ser data för.
+      </span>
     </label>
   );
-}
-
-function Alert({
-  type,
-  message,
-}: {
-  type: "error" | "success";
-  message: string;
-}) {
-  const styles =
-    type === "error"
-      ? "border-red-200 bg-red-50 text-red-700"
-      : "border-emerald-200 bg-emerald-50 text-emerald-700";
-
-  return <p className={`rounded-lg border px-4 py-3 text-sm ${styles}`}>{message}</p>;
 }
 
 function formatDate(date: string): string {

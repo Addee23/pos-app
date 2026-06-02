@@ -7,7 +7,7 @@ import {
 } from "@/lib/api-errors";
 import { prisma } from "@/lib/prisma";
 import { formatWooJsonForEditor, productToWooJson } from "@/lib/product-woo-json";
-import { isAdmin } from "@/lib/rbac";
+import { isAdmin } from "../../../../../../rbac";
 import { rateLimit } from "@/lib/rate-limit";
 
 type RouteContext = {

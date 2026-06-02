@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { useToast } from "@/components/ui/ToastProvider";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 type StoreOption = {
@@ -23,32 +24,28 @@ export function ProductUpdateTools({
   stores,
   defaultStoreId = "",
 }: ProductUpdateToolsProps) {
+  const router = useRouter();
+  const toast = useToast();
   const [storeId, setStoreId] = useState(
     defaultStoreId || stores[0]?.id || "",
   );
   const [products, setProducts] = useState<ProductPickOption[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
-  const [productsError, setProductsError] = useState<string | null>(null);
   const [selectedProductId, setSelectedProductId] = useState("");
   const [syncing, setSyncing] = useState(false);
-  const [syncMessage, setSyncMessage] = useState<string | null>(null);
-  const [syncError, setSyncError] = useState<string | null>(null);
   const [fetchedJson, setFetchedJson] = useState("");
   const [fetchingJson, setFetchingJson] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!storeId) {
       setProducts([]);
       setSelectedProductId("");
-      setProductsError(null);
       return;
     }
 
     let cancelled = false;
     setLoadingProducts(true);
-    setProductsError(null);
 
     void (async () => {
       try {
@@ -69,13 +66,13 @@ export function ProductUpdateTools({
               ? data.error
               : "Kunde inte ladda produkter för butiken";
           setProducts([]);
-          setProductsError(message);
+          toast.error(message);
           return;
         }
 
         if (!Array.isArray(data)) {
           setProducts([]);
-          setProductsError("Kunde inte läsa produktlistan");
+          toast.error("Kunde inte läsa produktlistan");
           return;
         }
 
@@ -90,7 +87,7 @@ export function ProductUpdateTools({
       } catch {
         if (!cancelled) {
           setProducts([]);
-          setProductsError("Något gick fel vid laddning av produkter");
+          toast.error("Något gick fel vid laddning av produkter");
         }
       } finally {
         if (!cancelled) {
@@ -102,7 +99,7 @@ export function ProductUpdateTools({
     return () => {
       cancelled = true;
     };
-  }, [storeId]);
+  }, [storeId, toast]);
 
   const activeProductId = useMemo(() => {
     if (
@@ -117,21 +114,11 @@ export function ProductUpdateTools({
 
   async function handleSyncProducts() {
     if (!storeId) {
-      setSyncError("Välj butik först.");
-      return;
-    }
-
-    const shouldSync = window.confirm(
-      "Uppdatera befintliga produkter från WooCommerce? Nya produkter i Woo som saknas lokalt hoppas över.",
-    );
-
-    if (!shouldSync) {
+      toast.error("Välj butik först.");
       return;
     }
 
     setSyncing(true);
-    setSyncError(null);
-    setSyncMessage(null);
 
     try {
       const response = await fetch(`/api/stores/${storeId}/products/sync`, {
@@ -139,25 +126,43 @@ export function ProductUpdateTools({
       });
       const data = (await response.json()) as {
         error?: string;
-        importedProducts?: number;
-        importedVariants?: number;
-        skippedProducts?: number;
+        createdProducts?: number;
+        updatedProducts?: number;
+        unchangedProducts?: number;
+        createdVariants?: number;
+        updatedVariants?: number;
+        unchangedVariants?: number;
         fetchedFromWoo?: number;
       };
 
       if (!response.ok) {
-        setSyncError(data.error ?? "Kunde inte uppdatera produkter");
+        toast.error(data.error ?? "Kunde inte uppdatera produkter");
         return;
       }
 
-      setSyncMessage(
-        `${data.importedProducts ?? 0} produkter och ${data.importedVariants ?? 0} varianter uppdaterades.` +
-          (data.skippedProducts
-            ? ` ${data.skippedProducts} nya i Woo hoppades över.`
-            : ""),
-      );
+      const created = data.createdProducts ?? 0;
+      const updated = data.updatedProducts ?? 0;
+      const unchanged = data.unchangedProducts ?? 0;
+
+      if (created === 0 && updated === 0) {
+        toast.info(
+          unchanged > 0
+            ? `Inga ändringar i WooCommerce. ${unchanged} produkter var redan uppdaterade.`
+            : "Inga produkter hittades att uppdatera från WooCommerce.",
+        );
+      } else {
+        const parts = [
+          created > 0 ? `${created} nya` : null,
+          updated > 0 ? `${updated} uppdaterade` : null,
+          unchanged > 0 ? `${unchanged} oförändrade` : null,
+        ].filter(Boolean);
+
+        toast.success(`Klart: ${parts.join(", ")}.`);
+      }
+
+      router.refresh();
     } catch {
-      setSyncError("Något gick fel vid uppdateringen");
+      toast.error("Något gick fel vid uppdateringen");
     } finally {
       setSyncing(false);
     }
@@ -165,12 +170,11 @@ export function ProductUpdateTools({
 
   async function handleFetchProductJson() {
     if (!activeProductId) {
-      setFetchError("Välj en produkt.");
+      toast.error("Välj en produkt.");
       return;
     }
 
     setFetchingJson(true);
-    setFetchError(null);
     setCopied(false);
 
     try {
@@ -181,13 +185,13 @@ export function ProductUpdateTools({
       };
 
       if (!response.ok) {
-        setFetchError(data.error ?? "Kunde inte hämta JSON");
+        toast.error(data.error ?? "Kunde inte hämta JSON");
         return;
       }
 
       setFetchedJson(data.jsonText ?? "");
     } catch {
-      setFetchError("Något gick fel vid hämtning av JSON");
+      toast.error("Något gick fel vid hämtning av JSON");
     } finally {
       setFetchingJson(false);
     }
@@ -203,7 +207,7 @@ export function ProductUpdateTools({
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      setFetchError("Kunde inte kopiera till urklipp");
+      toast.error("Kunde inte kopiera till urklipp");
     }
   }
 
@@ -211,21 +215,19 @@ export function ProductUpdateTools({
 
   return (
     <section className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm">
-      <div className="grid grid-cols-1 gap-2 border-b border-zinc-100 p-3 sm:grid-cols-2">
-        <Link
-          href="/admin/products/new"
-          className="flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-accent px-4 text-sm font-bold text-accent-foreground shadow-sm transition hover:bg-blue-600"
-        >
-          Lägg till produkt
-        </Link>
+      <div className="border-b border-zinc-100 p-3">
         <button
           type="button"
           onClick={() => void handleSyncProducts()}
           disabled={busy || !storeId}
-          className="min-h-11 cursor-pointer rounded-xl border border-zinc-200 bg-white px-4 text-sm font-bold text-zinc-800 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex min-h-11 w-full cursor-pointer items-center justify-center rounded-xl bg-accent px-4 text-sm font-bold text-accent-foreground shadow-sm transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {syncing ? "Uppdaterar…" : "Uppdatera produkter"}
+          {syncing ? "Uppdaterar produkter…" : "Uppdatera produkter"}
         </button>
+        <p className="mt-2 text-center text-xs leading-5 text-zinc-500">
+          Hämtar från WooCommerce. Nya produkter läggs till, befintliga
+          uppdateras bara om något ändrats där.
+        </p>
       </div>
 
       <div className="flex flex-col gap-4 p-4">
@@ -235,10 +237,7 @@ export function ProductUpdateTools({
             value={storeId}
             onChange={(event) => {
               setStoreId(event.target.value);
-              setSyncMessage(null);
-              setSyncError(null);
               setFetchedJson("");
-              setFetchError(null);
             }}
             className="h-10 w-full cursor-pointer rounded-xl bg-zinc-100/80 px-3 text-sm text-zinc-900 outline-none focus:bg-white focus:ring-2 focus:ring-zinc-200"
           >
@@ -250,17 +249,6 @@ export function ProductUpdateTools({
             ))}
           </select>
         </label>
-
-        {syncMessage ? (
-          <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            {syncMessage}
-          </p>
-        ) : null}
-        {syncError ? (
-          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
-            {syncError}
-          </p>
-        ) : null}
 
         <div className="rounded-xl border border-zinc-100 bg-zinc-50/50 p-3">
           <p className="text-xs font-semibold text-zinc-700">Hämta JSON</p>
@@ -298,10 +286,6 @@ export function ProductUpdateTools({
             </button>
           </div>
 
-          {productsError ? (
-            <p className="mt-2 text-xs text-red-600">{productsError}</p>
-          ) : null}
-
           {fetchedJson ? (
             <>
               <textarea
@@ -320,12 +304,6 @@ export function ProductUpdateTools({
                 </button>
               </div>
             </>
-          ) : null}
-
-          {fetchError ? (
-            <p className="mt-2 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-700">
-              {fetchError}
-            </p>
           ) : null}
         </div>
       </div>

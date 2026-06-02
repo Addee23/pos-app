@@ -1,8 +1,9 @@
 "use client";
 
 import { TaxonomyFields } from "@/components/products/TaxonomyFields";
+import { useToast } from "@/components/ui/ToastProvider";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 export type EditableProduct = {
   id: string;
@@ -34,14 +35,11 @@ type ProductEditFormProps = {
 
 export function ProductEditForm({ product }: ProductEditFormProps) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
 
   async function saveProduct(formData: FormData) {
     setSaving(true);
-    setError(null);
-    setSuccess(false);
 
     const body = {
       price: formData.get("price"),
@@ -61,15 +59,15 @@ export function ProductEditForm({ product }: ProductEditFormProps) {
       });
 
       if (!response.ok) {
-        setError(await getErrorMessage(response, "Kunde inte spara produkten"));
+        toast.error(await getErrorMessage(response, "Kunde inte spara produkten"));
         return;
       }
 
-      setSuccess(true);
+      toast.success("Produkten sparades.");
       router.refresh();
     } catch (error) {
       console.error(error);
-      setError("Något gick fel vid anropet. Försök igen.");
+      toast.error("Något gick fel vid anropet. Försök igen.");
     } finally {
       setSaving(false);
     }
@@ -110,19 +108,31 @@ export function ProductEditForm({ product }: ProductEditFormProps) {
             min="0"
             step="0.01"
             defaultValue={Number(product.price)}
+            placeholder="0.00"
+            hint="Pris i kronor exkl. eventuell moms."
           />
-          <Field label="EAN" name="ean" defaultValue={product.ean ?? ""} />
+          <Field
+            label="EAN"
+            name="ean"
+            defaultValue={product.ean ?? ""}
+            placeholder="7350012345678"
+            hint="Streckkod, SKU eller EAN för skanning i kassan."
+          />
           <Field
             label="Lagersaldo"
             name="stockQuantity"
             type="number"
             min="0"
             defaultValue={product.stockQuantity}
+            placeholder="0"
+            hint="Antal i lager just nu."
           />
           <Field
             label="Lagerplats"
             name="stockLocation"
             defaultValue={product.stockLocation ?? ""}
+            placeholder="Hylla A3"
+            hint="Var produkten står i butiken."
           />
         </div>
 
@@ -135,9 +145,6 @@ export function ProductEditForm({ product }: ProductEditFormProps) {
             />
           </div>
         </div>
-
-        {error ? <Alert type="error" message={error} /> : null}
-        {success ? <Alert type="success" message="Produkten sparades." /> : null}
 
         <button
           type="submit"
@@ -177,14 +184,11 @@ function VariantForm({
   variant: EditableProductVariant;
 }) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const toast = useToast();
   const [saving, setSaving] = useState(false);
 
   async function saveVariant(formData: FormData) {
     setSaving(true);
-    setError(null);
-    setSuccess(false);
 
     const body = {
       price: formData.get("price"),
@@ -204,15 +208,15 @@ function VariantForm({
       );
 
       if (!response.ok) {
-        setError(await getErrorMessage(response, "Kunde inte spara varianten"));
+        toast.error(await getErrorMessage(response, "Kunde inte spara varianten"));
         return;
       }
 
-      setSuccess(true);
+      toast.success("Varianten sparades.");
       router.refresh();
     } catch (error) {
       console.error(error);
-      setError("Något gick fel vid anropet. Försök igen.");
+      toast.error("Något gick fel vid anropet. Försök igen.");
     } finally {
       setSaving(false);
     }
@@ -242,22 +246,32 @@ function VariantForm({
         min="0"
         step="0.01"
         defaultValue={Number(variant.price)}
+        placeholder="0.00"
+        hint="Pris i kronor för denna variant."
       />
-      <Field label="EAN" name="ean" defaultValue={variant.ean ?? ""} />
+      <Field
+        label="EAN"
+        name="ean"
+        defaultValue={variant.ean ?? ""}
+        placeholder="7350012345678"
+        hint="Streckkod eller SKU för varianten."
+      />
       <Field
         label="Lager"
         name="stockQuantity"
         type="number"
         min="0"
         defaultValue={variant.stockQuantity}
+        placeholder="0"
+        hint="Antal i lager för denna variant."
       />
       <Field
         label="Lagerplats"
         name="stockLocation"
         defaultValue={variant.stockLocation ?? ""}
+        placeholder="Hylla A3"
+        hint="Var varianten står i butiken."
       />
-      {error ? <Alert type="error" message={error} /> : null}
-      {success ? <Alert type="success" message="Varianten sparades." /> : null}
       <button
         type="submit"
         disabled={saving}
@@ -277,43 +291,42 @@ function Field({
   step,
   min,
   placeholder,
+  hint,
 }: {
   label: string;
   name: string;
   defaultValue?: string | number;
   placeholder?: string;
+  hint?: string;
   type?: string;
   step?: string;
   min?: string;
 }) {
+  const generatedId = useId();
+  const inputId = `${name}-${generatedId}`;
+  const hintId = hint ? `${inputId}-hint` : undefined;
+
   return (
-    <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+    <label htmlFor={inputId} className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
       {label}
       <input
+        id={inputId}
         name={name}
         type={type}
         step={step}
         min={min}
         defaultValue={defaultValue}
         placeholder={placeholder}
-        className="min-h-12 cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
+        aria-describedby={hintId}
+        className="min-h-12 cursor-text rounded-lg border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
       />
+      {hint ? (
+        <span id={hintId} className="text-xs font-normal leading-5 text-zinc-500">
+          {hint}
+        </span>
+      ) : null}
     </label>
   );
-}
-
-function Alert({
-  type,
-  message,
-}: {
-  type: "error" | "success";
-  message: string;
-}) {
-  const styles =
-    type === "error"
-      ? "bg-red-50 text-red-700"
-      : "bg-emerald-50 text-emerald-700";
-  return <p className={`rounded-lg px-3 py-2 text-sm ${styles}`}>{message}</p>;
 }
 
 async function getErrorMessage(

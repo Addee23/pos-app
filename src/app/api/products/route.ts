@@ -7,7 +7,7 @@ import {
 } from "@/lib/product-create";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
-import { isAdmin } from "@/lib/rbac";
+import { isAdmin } from "../../../../rbac";
 import {
   productCreateSchema,
   productSearchSchema,

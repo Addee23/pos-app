@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { createAuditLog } from "@/lib/audit";
-import { isAdmin } from "@/lib/rbac";
+import { isAdmin } from "../../../../../../../../rbac";
 import { rateLimit } from "@/lib/rate-limit";
 import { productMetaBatchSaveSchema } from "@/lib/validations/product-meta";
 

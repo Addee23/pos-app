@@ -8,6 +8,7 @@ import {
   type PickupDashboardTab,
 } from "@/lib/pickup-dashboard";
 import type { PickupDashboardPayload } from "@/lib/pickup-dashboard-data";
+import { useToast } from "@/components/ui/ToastProvider";
 import type { SerializedPickup } from "@/lib/pickup-serialize";
 
 type UserRole = "ADMIN" | "PERSONAL";
@@ -39,6 +40,7 @@ export function PickupClient({
   initialDashboard,
   currentRole,
 }: PickupClientProps) {
+  const toast = useToast();
   const [query, setQuery] = useState("");
   const [dashboard, setDashboard] = useState(initialDashboard);
   const [searchResults, setSearchResults] = useState<Pickup[] | null>(null);
@@ -51,9 +53,6 @@ export function PickupClient({
   const [activePickupId, setActivePickupId] = useState<string | null>(null);
   const [popupOpen, setPopupOpen] = useState(false);
   const [selectedPickupId, setSelectedPickupId] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
   const tabPickups = dashboard[activeTab];
   const totalForTab = dashboard.counts[activeTab];
 
@@ -111,8 +110,6 @@ export function PickupClient({
   async function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSearching(true);
-    setMessage(null);
-    setError(null);
     setPopupOpen(false);
     setSelectedPickupId(null);
 
@@ -121,7 +118,7 @@ export function PickupClient({
       const data = (await response.json()) as Pickup[] | { error?: string };
 
       if (!response.ok) {
-        setError(
+        toast.error(
           "error" in data && data.error
             ? data.error
             : "Kunde inte söka upphämtningar",
@@ -130,20 +127,20 @@ export function PickupClient({
       }
 
       if (!Array.isArray(data)) {
-        setError("Kunde inte läsa upphämtningssvaret.");
+        toast.error("Kunde inte läsa upphämtningssvaret.");
         return;
       }
 
       setSearchResults(data);
 
       if (data.length === 0) {
-        setError("Ingen upphämtning hittades.");
+        toast.error("Ingen upphämtning hittades.");
         return;
       }
 
       setPopupOpen(true);
     } catch {
-      setError("Något gick fel vid sökningen");
+      toast.error("Något gick fel vid sökningen");
     } finally {
       setIsSearching(false);
     }
@@ -151,8 +148,6 @@ export function PickupClient({
 
   async function completePickup(pickupId: string) {
     setActivePickupId(pickupId);
-    setMessage(null);
-    setError(null);
 
     try {
       const response = await fetch(`/api/pickups/${pickupId}/complete`, {
@@ -161,7 +156,7 @@ export function PickupClient({
       const data = (await response.json()) as Pickup | { error?: string };
 
       if (!response.ok) {
-        setError(
+        toast.error(
           "error" in data && data.error
             ? data.error
             : "Kunde inte markera upphämtningen",
@@ -170,14 +165,14 @@ export function PickupClient({
       }
 
       if (!("id" in data)) {
-        setError("Kunde inte läsa den uppdaterade upphämtningen.");
+        toast.error("Kunde inte läsa den uppdaterade upphämtningen.");
         return;
       }
 
       await applyPickupUpdate(data);
-      setMessage("Upphämtningen är markerad som hämtad");
+      toast.success("Upphämtningen är markerad som hämtad");
     } catch {
-      setError("Något gick fel när upphämtningen skulle sparas");
+      toast.error("Något gick fel när upphämtningen skulle sparas");
     } finally {
       setActivePickupId(null);
     }
@@ -193,8 +188,6 @@ export function PickupClient({
     }
 
     setActivePickupId(pickupId);
-    setMessage(null);
-    setError(null);
 
     try {
       const response = await fetch(`/api/pickups/${pickupId}/cancel`, {
@@ -203,7 +196,7 @@ export function PickupClient({
       const data = (await response.json()) as Pickup | { error?: string };
 
       if (!response.ok) {
-        setError(
+        toast.error(
           "error" in data && data.error
             ? data.error
             : "Kunde inte avbryta ordern",
@@ -212,14 +205,14 @@ export function PickupClient({
       }
 
       if (!("id" in data)) {
-        setError("Kunde inte läsa den avbrutna ordern.");
+        toast.error("Kunde inte läsa den avbrutna ordern.");
         return;
       }
 
       await applyPickupUpdate(data);
-      setMessage("Ordern är avbruten");
+      toast.success("Ordern är avbruten");
     } catch {
-      setError("Något gick fel när ordern skulle avbrytas");
+      toast.error("Något gick fel när ordern skulle avbrytas");
     } finally {
       setActivePickupId(null);
     }
@@ -264,19 +257,25 @@ export function PickupClient({
         onSubmit={handleSearch}
         className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-4"
       >
-        <label
-          className="text-sm font-semibold text-zinc-700"
-          htmlFor="pickup-search"
-        >
-          Sök eller scanna
-        </label>
-        <input
-          id="pickup-search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          className="min-h-12 rounded-lg border border-zinc-200 px-3 text-base outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
-          placeholder="Kod, kund, produkt eller https-länk"
-        />
+        <div className="flex flex-col gap-1">
+          <label
+            className="text-sm font-semibold text-zinc-700"
+            htmlFor="pickup-search"
+          >
+            Sök eller scanna
+          </label>
+          <input
+            id="pickup-search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="min-h-12 rounded-lg border border-zinc-200 px-3 text-base outline-none placeholder:text-zinc-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
+            placeholder="Kod, kund, produkt eller https-länk"
+            aria-describedby="pickup-search-hint"
+          />
+          <span id="pickup-search-hint" className="text-xs font-normal leading-5 text-zinc-500">
+            Sök på upphämtningskod, kundnamn, produkt eller klistra in orderlänk från WooCommerce.
+          </span>
+        </div>
         <button
           type="submit"
           disabled={isSearching}
@@ -285,18 +284,6 @@ export function PickupClient({
           {isSearching ? "Söker..." : "Sök upphämtning"}
         </button>
       </form>
-
-      {message ? (
-        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          {message}
-        </p>
-      ) : null}
-
-      {error ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </p>
-      ) : null}
 
       <div className="flex items-center justify-between gap-2 px-1 text-xs text-zinc-500">
         <p>
@@ -497,8 +484,8 @@ function PickupPopup({
   onComplete: (pickupId: string) => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-zinc-950/35 px-3 pb-3 pt-10">
-      <section className="max-h-[88vh] w-full max-w-[430px] overflow-y-auto rounded-[2rem] bg-[#f3eee5] p-4 shadow-2xl">
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-zinc-950/35 px-3 pb-3 pt-10 lg:items-center lg:p-6">
+      <section className="max-h-[88vh] w-full max-w-[430px] overflow-y-auto rounded-[2rem] bg-[#f3eee5] p-4 shadow-2xl lg:max-w-xl">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-orange-600">

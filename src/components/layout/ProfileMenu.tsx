@@ -1,5 +1,7 @@
 "use client";
 
+import { InputField } from "@/components/ui/FormField";
+import { useToast } from "@/components/ui/ToastProvider";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
 
@@ -10,16 +12,13 @@ type ProfileMenuProps = {
 };
 
 export function ProfileMenu({ userName, roleLabel, role }: ProfileMenuProps) {
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [passwordFormOpen, setPasswordFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   async function changePassword(formData: FormData) {
     setSaving(true);
-    setError(null);
-    setSuccess(null);
 
     try {
       const response = await fetch("/api/profile/password", {
@@ -36,14 +35,14 @@ export function ProfileMenu({ userName, roleLabel, role }: ProfileMenuProps) {
         const data = (await response.json().catch(() => null)) as {
           error?: string;
         } | null;
-        setError(data?.error ?? "Kunde inte byta lösenord");
+        toast.error(data?.error ?? "Kunde inte byta lösenord");
         return;
       }
 
-      setSuccess("Lösenordet är uppdaterat.");
+      toast.success("Lösenordet är uppdaterat.");
     } catch (error) {
       console.error(error);
-      setError("Något gick fel vid anropet. Försök igen.");
+      toast.error("Något gick fel vid anropet. Försök igen.");
     } finally {
       setSaving(false);
     }
@@ -87,11 +86,7 @@ export function ProfileMenu({ userName, roleLabel, role }: ProfileMenuProps) {
               {role === "PERSONAL" ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    setPasswordFormOpen(true);
-                    setError(null);
-                    setSuccess(null);
-                  }}
+                  onClick={() => setPasswordFormOpen(true)}
                   className="min-h-11 w-full cursor-pointer rounded-2xl bg-blue-50 px-4 text-left text-sm font-bold text-blue-700 transition hover:bg-blue-100"
                 >
                   Byt lösenord
@@ -110,41 +105,41 @@ export function ProfileMenu({ userName, roleLabel, role }: ProfileMenuProps) {
             <form action={changePassword} className="mt-4 flex flex-col gap-3">
               <button
                 type="button"
-                onClick={() => {
-                  setPasswordFormOpen(false);
-                  setError(null);
-                  setSuccess(null);
-                }}
+                onClick={() => setPasswordFormOpen(false)}
                 className="w-fit cursor-pointer text-xs font-bold text-zinc-500 hover:text-blue-700"
               >
                 Tillbaka
               </button>
-              <ProfileField
+              <InputField
                 label="Nuvarande lösenord"
                 name="currentPassword"
+                type="password"
                 autoComplete="current-password"
+                placeholder="••••••••"
+                hint="Ditt nuvarande inloggningslösenord."
+                labelClassName="text-xs font-bold text-zinc-600"
+                inputClassName="min-h-11 rounded-2xl"
               />
-              <ProfileField
+              <InputField
                 label="Nytt lösenord"
                 name="newPassword"
+                type="password"
                 autoComplete="new-password"
+                placeholder="Minst 8 tecken"
+                hint="Välj ett starkt lösenord som du inte använder på andra ställen."
+                labelClassName="text-xs font-bold text-zinc-600"
+                inputClassName="min-h-11 rounded-2xl"
               />
-              <ProfileField
+              <InputField
                 label="Bekräfta nytt lösenord"
                 name="confirmPassword"
+                type="password"
                 autoComplete="new-password"
+                placeholder="Upprepa nytt lösenord"
+                hint="Måste matcha det nya lösenordet ovan."
+                labelClassName="text-xs font-bold text-zinc-600"
+                inputClassName="min-h-11 rounded-2xl"
               />
-
-              {error ? (
-                <p className="rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
-                  {error}
-                </p>
-              ) : null}
-              {success ? (
-                <p className="rounded-2xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
-                  {success}
-                </p>
-              ) : null}
 
               <button
                 type="submit"
@@ -158,28 +153,6 @@ export function ProfileMenu({ userName, roleLabel, role }: ProfileMenuProps) {
         </div>
       ) : null}
     </div>
-  );
-}
-
-function ProfileField({
-  label,
-  name,
-  autoComplete,
-}: {
-  label: string;
-  name: string;
-  autoComplete: string;
-}) {
-  return (
-    <label className="flex flex-col gap-1 text-xs font-bold text-zinc-600">
-      {label}
-      <input
-        name={name}
-        type="password"
-        autoComplete={autoComplete}
-        className="min-h-11 rounded-2xl border border-zinc-200 bg-white px-3 text-base font-normal text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
-      />
-    </label>
   );
 }
 

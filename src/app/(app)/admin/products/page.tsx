@@ -58,27 +58,27 @@ export default async function AdminProductsPage({
       : {}),
   };
 
-  const [stores, totalProducts, filterOptions] = await Promise.all([
+  const [stores, totalProducts, filterOptions, products] = await Promise.all([
     prisma.store.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
     prisma.product.count({ where }),
     loadProductFilterOptions(storeId),
+    prisma.product.findMany({
+      where,
+      include: {
+        store: { select: { id: true, name: true } },
+        variants: { orderBy: { name: "asc" } },
+      },
+      orderBy: { name: "asc" },
+      skip: (requestedPage - 1) * PRODUCTS_PER_PAGE,
+      take: PRODUCTS_PER_PAGE,
+    }),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(totalProducts / PRODUCTS_PER_PAGE));
   const currentPage = Math.min(requestedPage, totalPages);
-  const products = await prisma.product.findMany({
-    where,
-    include: {
-      store: { select: { id: true, name: true } },
-      variants: { orderBy: { name: "asc" } },
-    },
-    orderBy: { name: "asc" },
-    skip: (currentPage - 1) * PRODUCTS_PER_PAGE,
-    take: PRODUCTS_PER_PAGE,
-  });
 
   return (
     <section className="flex flex-col gap-4">

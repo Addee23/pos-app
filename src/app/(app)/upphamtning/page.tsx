@@ -19,9 +19,11 @@ export default async function UpphämtningPage() {
   }
 
   try {
-    await processPendingPickupEmails(session.user.storeId);
+    void processPendingPickupEmails(session.user.storeId).catch((error) => {
+      console.error("Kunde inte skicka väntande upphämtningsmail:", error);
+    });
   } catch (error) {
-    console.error("Kunde inte skicka väntande upphämtningsmail:", error);
+    console.error("Kunde inte starta bakgrundssändning av upphämtningsmail:", error);
   }
 
   const initialDashboard = await loadPickupDashboard(session.user.storeId);

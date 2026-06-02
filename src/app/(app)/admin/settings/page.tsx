@@ -7,7 +7,7 @@ import { StoreSettingsForm } from "@/components/settings/StoreSettingsForm";
 import { getWooWebhookMode } from "@/lib/woo-webhook-config";
 
 type SettingsPageProps = {
-  searchParams: Promise<{ storeId?: string }>;
+  searchParams: Promise<{ storeId?: string; section?: string }>;
 };
 
 export default async function AdminSettingsPage({
@@ -18,7 +18,7 @@ export default async function AdminSettingsPage({
     redirect("/kassa");
   }
 
-  const { storeId } = await searchParams;
+  const { storeId, section } = await searchParams;
   const requestHeaders = await headers();
   const host = requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
@@ -80,7 +80,8 @@ export default async function AdminSettingsPage({
         </p>
         <h2 className="mt-1 text-xl font-semibold text-zinc-900">Inställningar</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-500">
-          Butik, integration, kvitto och e-post.
+          Välj butik och öppna rätt sektion i menyn — Butik, WooCommerce, E-post
+          eller Kvitto.
         </p>
       </div>
 
@@ -89,6 +90,7 @@ export default async function AdminSettingsPage({
         store={store}
         baseUrl={baseUrl}
         webhookMode={getWooWebhookMode()}
+        initialSection={section}
       />
     </section>
   );

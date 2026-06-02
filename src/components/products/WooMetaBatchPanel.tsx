@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useToast } from "@/components/ui/ToastProvider";
 import { generateProductMeta } from "@/lib/generate-product-meta";
 
 type StoreOption = {
@@ -34,33 +35,28 @@ export function WooMetaBatchPanel({
   lockStoreId,
   embedded = false,
 }: WooMetaBatchPanelProps) {
+  const toast = useToast();
   const [storeId, setStoreId] = useState(
     lockStoreId ?? (defaultStoreId || stores[0]?.id || ""),
   );
   const [items, setItems] = useState<MetaBatchItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (lockStoreId) {
       setStoreId(lockStoreId);
       setItems([]);
-      setSuccess(null);
-      setError(null);
     }
   }, [lockStoreId]);
 
   async function loadBatch() {
     if (!storeId) {
-      setError("Välj butik.");
+      toast.error("Välj butik.");
       return;
     }
 
     setLoading(true);
-    setError(null);
-    setSuccess(null);
 
     try {
       const response = await fetch(
@@ -72,13 +68,13 @@ export function WooMetaBatchPanel({
       };
 
       if (!response.ok) {
-        setError(data.error ?? "Kunde inte hämta produkter");
+        toast.error(data.error ?? "Kunde inte hämta produkter");
         return;
       }
 
       setItems(data.items ?? []);
     } catch {
-      setError("Något gick fel");
+      toast.error("Något gick fel");
     } finally {
       setLoading(false);
     }
@@ -144,8 +140,6 @@ export function WooMetaBatchPanel({
     }
 
     setSaving(true);
-    setError(null);
-    setSuccess(null);
 
     try {
       const response = await fetch(
@@ -169,13 +163,13 @@ export function WooMetaBatchPanel({
       };
 
       if (!response.ok) {
-        setError(data.error ?? "Kunde inte spara");
+        toast.error(data.error ?? "Kunde inte spara");
         return;
       }
 
-      setSuccess("Sparat.");
+      toast.success("Sparat.");
     } catch {
-      setError("Kunde inte spara");
+      toast.error("Kunde inte spara");
     } finally {
       setSaving(false);
     }
@@ -206,7 +200,6 @@ export function WooMetaBatchPanel({
           onChange={(event) => {
             setStoreId(event.target.value);
             setItems([]);
-            setSuccess(null);
           }}
           className="h-10 w-full cursor-pointer rounded-xl bg-zinc-100/80 px-3 text-sm text-zinc-900 outline-none focus:bg-white focus:ring-2 focus:ring-zinc-200"
         >
@@ -305,9 +298,16 @@ export function WooMetaBatchPanel({
                           })
                         }
                         rows={4}
-                        placeholder="Text som kunden ser…"
+                        placeholder="Kort beskrivning som kunden ser i upphämtningsmail…"
+                        aria-describedby={`meta-hint-${item.id}`}
                         className={textareaClass}
                       />
+                      <span
+                        id={`meta-hint-${item.id}`}
+                        className="text-[11px] font-normal leading-5 text-zinc-400"
+                      >
+                        Visas för kunden i mailet när ordern är redo för upphämtning.
+                      </span>
                     </Field>
                   </div>
                 </div>
@@ -343,17 +343,6 @@ export function WooMetaBatchPanel({
           Välj butik och hämta produkter.
         </p>
       )}
-
-      {error ? (
-        <p className="mt-2 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-700">
-          {error}
-        </p>
-      ) : null}
-      {success ? (
-        <p className="mt-2 rounded-lg bg-emerald-50 px-2 py-1.5 text-xs text-emerald-700">
-          {success}
-        </p>
-      ) : null}
     </>
   );
 
