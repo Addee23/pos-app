@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { createAuditLog } from "@/lib/audit";
+import { buildMetaBatchProductWhere } from "@/lib/meta-batch";
 import { isAdmin } from "../../../../../../../../rbac";
 import { rateLimit } from "@/lib/rate-limit";
 import { productMetaBatchSaveSchema } from "@/lib/validations/product-meta";
@@ -56,11 +57,12 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Butiken finns inte" }, { status: 404 });
   }
 
-  let saved = 0;
+  const { groupBy, rows } = parsed.data;
+  let savedProducts = 0;
 
-  for (const item of parsed.data.items) {
-    const existing = await prisma.product.findFirst({
-      where: { id: item.id, storeId },
+  for (const row of rows) {
+    const products = await prisma.product.findMany({
+      where: buildMetaBatchProductWhere(storeId, groupBy, row.key),
       select: {
         id: true,
         storeId: true,
@@ -69,41 +71,40 @@ export async function POST(request: Request, context: RouteContext) {
       },
     });
 
-    if (!existing) {
-      continue;
-    }
+    for (const existing of products) {
+      const product = await prisma.product.update({
+        where: { id: existing.id },
+        data: {
+          shortDescription: row.shortDescription,
+          metaDescription: row.metaDescription,
+        },
+      });
 
-    const product = await prisma.product.update({
-      where: { id: item.id },
-      data: {
-        shortDescription: item.shortDescription,
-        metaDescription: item.metaDescription,
-      },
-    });
+      savedProducts += 1;
 
-    saved += 1;
-
-    for (const field of [
-      "shortDescription",
-      "metaDescription",
-    ] as const) {
-      const oldVal = String(existing[field] ?? "");
-      const newVal = String(product[field] ?? "");
-      if (oldVal !== newVal) {
-        await createAuditLog({
-          userId: session.user.id,
-          storeId: product.storeId,
-          entityType: "Product",
-          entityId: product.id,
-          field,
-          oldValue: oldVal,
-          newValue: newVal,
-        });
+      for (const field of ["shortDescription", "metaDescription"] as const) {
+        const oldVal = String(existing[field] ?? "");
+        const newVal = String(product[field] ?? "");
+        if (oldVal !== newVal) {
+          await createAuditLog({
+            userId: session.user.id,
+            storeId: product.storeId,
+            entityType: "Product",
+            entityId: product.id,
+            field,
+            oldValue: oldVal,
+            newValue: newVal,
+          });
+        }
       }
     }
   }
 
-  return NextResponse.json({ saved, total: parsed.data.items.length });
+  return NextResponse.json({
+    savedProducts,
+    savedGroups: rows.length,
+    groupBy,
+  });
 }
 
 async function readJsonBody(

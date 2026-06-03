@@ -1,3 +1,4 @@
+import type { Prisma } from "@/generated/prisma/client";
 import type { PrismaClient, Product, ProductVariant } from "@/generated/prisma/client";
 import {
   canLoadWooVariations,
@@ -134,6 +135,7 @@ function productWritePayload(product: ImportedWooProduct) {
     category: product.category,
     brand: product.brand,
     country: product.country,
+    wooMetadata: product.wooMetadata as Prisma.InputJsonValue,
     stockQuantity: product.stockQuantity,
   };
 }
@@ -228,6 +230,7 @@ function hasProductChanges(
     existing.category !== incoming.category ||
     existing.brand !== incoming.brand ||
     existing.country !== incoming.country ||
+    !metadataEquals(existing.wooMetadata, incoming.wooMetadata) ||
     existing.stockQuantity !== incoming.stockQuantity
   );
 }
@@ -261,4 +264,8 @@ function comparePrice(left: unknown, right: string): number {
 function normalizePrice(value: unknown): string {
   const price = Number(value);
   return Number.isFinite(price) && price >= 0 ? price.toFixed(2) : "0.00";
+}
+
+function metadataEquals(left: unknown, right: Record<string, unknown>): boolean {
+  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
 }

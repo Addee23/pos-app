@@ -1,31 +1,22 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/components/ui/ToastProvider";
-import { generateProductMeta } from "@/lib/generate-product-meta";
+import {
+  WOO_META_FIELD_SUGGESTIONS,
+  type WooMetaPreviewRow,
+} from "@/lib/woo-meta-preview";
 
 type StoreOption = {
   id: string;
   name: string;
 };
 
-export type MetaBatchItem = {
-  id: string;
-  name: string;
-  shortDescription: string | null;
-  metaDescription: string | null;
-  wooProductId: number;
-  category: string | null;
-  brand: string | null;
-  country: string | null;
-};
-
 type WooMetaBatchPanelProps = {
   stores?: StoreOption[];
   defaultStoreId?: string;
-  /** Låst till butik från inställningssidan – ingen extra butiksväljare. */
   lockStoreId?: string;
-  /** Inbäddad i WooCommerce-kortet på inställningar. */
+  lockStoreName?: string;
   embedded?: boolean;
 };
 
@@ -33,161 +24,178 @@ export function WooMetaBatchPanel({
   stores = [],
   defaultStoreId = "",
   lockStoreId,
+  lockStoreName,
   embedded = false,
 }: WooMetaBatchPanelProps) {
   const toast = useToast();
   const [storeId, setStoreId] = useState(
     lockStoreId ?? (defaultStoreId || stores[0]?.id || ""),
   );
-  const [items, setItems] = useState<MetaBatchItem[]>([]);
+  const [fieldInput, setFieldInput] = useState("land");
+  const [fieldError, setFieldError] = useState("");
+  const [rows, setRows] = useState<WooMetaPreviewRow[]>([]);
+  const [productCount, setProductCount] = useState(0);
+  const [productsWithMetadata, setProductsWithMetadata] = useState(0);
+  const [activeField, setActiveField] = useState("");
+  const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (lockStoreId) {
       setStoreId(lockStoreId);
-      setItems([]);
+      setRows([]);
+      setLoaded(false);
     }
   }, [lockStoreId]);
 
-  async function loadBatch() {
+  function selectFieldSuggestion(input: string) {
+    setFieldInput(input);
+    setFieldError("");
+    setRows([]);
+    setLoaded(false);
+  }
+
+  async function loadPreview() {
     if (!storeId) {
       toast.error("Välj butik.");
       return;
     }
 
+    const field = fieldInput.trim();
+    if (!field) {
+      setFieldError("Skriv vilket JSON-fält du vill söka på.");
+      return;
+    }
+
+    setFieldError("");
     setLoading(true);
 
     try {
       const response = await fetch(
-        `/api/stores/${storeId}/products/meta-batch?limit=10`,
+        `/api/stores/${storeId}/products/meta-batch?field=${encodeURIComponent(field)}`,
       );
-      const data = (await response.json()) as {
+      const raw = await response.text();
+      let data: {
         error?: string;
-        items?: MetaBatchItem[];
-      };
+        rows?: WooMetaPreviewRow[];
+        productCount?: number;
+        productsWithMetadata?: number;
+        field?: string;
+      } = {};
 
-      if (!response.ok) {
-        toast.error(data.error ?? "Kunde inte hämta produkter");
+      try {
+        data = raw ? (JSON.parse(raw) as typeof data) : {};
+      } catch {
+        toast.error(
+          response.ok
+            ? "Ogiltigt svar från servern"
+            : "Serverfel – prova att starta om dev-servern (npm run dev)",
+        );
         return;
       }
 
-      setItems(data.items ?? []);
-    } catch {
-      toast.error("Något gick fel");
+      if (!response.ok) {
+        toast.error(data.error ?? "Kunde inte hämta meta");
+        return;
+      }
+
+      setRows(data.rows ?? []);
+      setProductCount(data.productCount ?? 0);
+      setProductsWithMetadata(data.productsWithMetadata ?? 0);
+      setActiveField(data.field ?? field);
+      setLoaded(true);
+
+      if ((data.productsWithMetadata ?? 0) === 0) {
+        toast.error(
+          "Ingen sparad produktmeta ännu. Kör Uppdatera produkter efter Woo-koppling.",
+        );
+        return;
+      }
+
+      if ((data.rows ?? []).length === 0) {
+        toast.error("Inga träffar för det fältet.");
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Något gick fel";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   }
 
-  function updateItem(id: string, patch: Partial<MetaBatchItem>) {
-    setItems((current) =>
-      current.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-    );
-  }
+  const controls = (
+    <div className="flex flex-col gap-3">
+      {lockStoreId && lockStoreName ? (
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+          <p className="text-[11px] font-medium text-zinc-500">Butik</p>
+          <p className="text-sm font-semibold text-zinc-900">{lockStoreName}</p>
+          <p className="mt-0.5 text-[11px] leading-5 text-zinc-400">
+            Byt butik med listan <strong>Välj butik</strong> högst upp på sidan.
+          </p>
+        </div>
+      ) : null}
 
-  function generateMetaForItem(id: string) {
-    setItems((current) =>
-      current.map((item) => {
-        if (item.id !== id) {
-          return item;
-        }
+      <div className="flex flex-col gap-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-zinc-500">
+            Sök sparad produktmeta efter fält
+          </span>
+          <input
+            type="text"
+            value={fieldInput}
+            onChange={(event) => {
+              setFieldInput(event.target.value);
+              setFieldError("");
+              setRows([]);
+              setLoaded(false);
+            }}
+            placeholder="t.ex. land, format, smak, roktid"
+            className="h-10 w-full rounded-xl bg-zinc-100/80 px-3 text-sm text-zinc-900 outline-none transition focus:bg-white focus:ring-2 focus:ring-zinc-200"
+          />
+          {fieldError ? (
+            <span className="text-[11px] font-medium text-red-600">{fieldError}</span>
+          ) : null}
+        </label>
 
-        const generated = generateProductMeta({
-          name: item.name,
-          shortDescription: item.shortDescription,
-          category: item.category,
-          brand: item.brand,
-          country: item.country,
-        });
+        <div className="flex flex-wrap gap-2">
+          {WOO_META_FIELD_SUGGESTIONS.map((suggestion) => {
+            const active = fieldInput.trim().toLowerCase() === suggestion.input;
 
-        return {
-          ...item,
-          metaDescription: generated.metaDescription,
-          shortDescription: generated.shortDescription,
-        };
-      }),
-    );
-  }
+            return (
+              <button
+                key={suggestion.input}
+                type="button"
+                onClick={() => selectFieldSuggestion(suggestion.input)}
+                className={`cursor-pointer rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                  active
+                    ? "bg-zinc-900 text-white"
+                    : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                }`}
+              >
+                {suggestion.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-  function generateAllMeta() {
-    setItems((current) =>
-      current.map((item) => {
-        const generated = generateProductMeta({
-          name: item.name,
-          shortDescription: item.shortDescription,
-          category: item.category,
-          brand: item.brand,
-          country: item.country,
-        });
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-medium text-zinc-600">
+          {loaded
+            ? `${rows.length} grupp${rows.length === 1 ? "" : "er"} · ${productCount} produkter`
+            : "Förhandsvisning av meta"}
+        </p>
+        <button
+          type="button"
+          onClick={() => void loadPreview()}
+          disabled={loading || !storeId}
+          className="h-9 cursor-pointer rounded-lg bg-zinc-900 px-3 text-xs font-semibold text-white transition hover:bg-zinc-800 disabled:bg-zinc-300"
+        >
+          {loading ? "Hämtar…" : "Hämta meta"}
+        </button>
+      </div>
 
-        return {
-          ...item,
-          metaDescription: generated.metaDescription,
-          shortDescription: generated.shortDescription,
-        };
-      }),
-    );
-  }
-
-  function removeItem(id: string) {
-    setItems((current) => current.filter((item) => item.id !== id));
-  }
-
-  async function saveBatch() {
-    if (!storeId || items.length === 0) {
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      const response = await fetch(
-        `/api/stores/${storeId}/products/meta-batch/save`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            items: items.map((item) => ({
-              id: item.id,
-              shortDescription: item.shortDescription,
-              metaDescription: item.metaDescription,
-            })),
-          }),
-        },
-      );
-
-      const data = (await response.json()) as {
-        error?: string;
-        saved?: number;
-      };
-
-      if (!response.ok) {
-        toast.error(data.error ?? "Kunde inte spara");
-        return;
-      }
-
-      toast.success("Sparat.");
-    } catch {
-      toast.error("Kunde inte spara");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const busy = loading || saving;
-
-  const toolbar = (
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-xs font-medium text-zinc-600">Produktmeta · 10 åt gången</p>
-      <button
-        type="button"
-        onClick={() => void loadBatch()}
-        disabled={busy || !storeId}
-        className="h-9 cursor-pointer rounded-lg bg-zinc-100 px-3 text-xs font-semibold text-zinc-800 transition hover:bg-zinc-200 disabled:opacity-50"
-      >
-        {loading ? "Hämtar…" : "Hämta produkter"}
-      </button>
     </div>
   );
 
@@ -199,7 +207,8 @@ export function WooMetaBatchPanel({
           value={storeId}
           onChange={(event) => {
             setStoreId(event.target.value);
-            setItems([]);
+            setRows([]);
+            setLoaded(false);
           }}
           className="h-10 w-full cursor-pointer rounded-xl bg-zinc-100/80 px-3 text-sm text-zinc-900 outline-none focus:bg-white focus:ring-2 focus:ring-zinc-200"
         >
@@ -215,132 +224,92 @@ export function WooMetaBatchPanel({
 
   const body = (
     <>
-      {embedded ? toolbar : (
+      {embedded ? (
+        controls
+      ) : (
         <div className="border-b border-zinc-100 px-4 py-3.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h4 className="text-sm font-semibold text-zinc-900">Produktmeta</h4>
-            {items.length > 0 ? (
-              <span className="text-xs text-zinc-400">{items.length} st</span>
+            {loaded ? (
+              <span className="text-xs text-zinc-400">{rows.length} st</span>
             ) : null}
           </div>
           {storePicker}
-          <div className={storePicker ? "mt-3" : "mt-3 flex justify-end"}>
-            <button
-              type="button"
-              onClick={() => void loadBatch()}
-              disabled={busy || !storeId}
-              className="h-10 cursor-pointer rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:bg-zinc-300"
-            >
-              {loading ? "Hämtar…" : "Hämta"}
-            </button>
-          </div>
+          <div className="mt-3">{controls}</div>
         </div>
       )}
 
       {embedded ? storePicker : null}
 
-      {items.length > 0 ? (
+      {rows.length > 0 ? (
         <>
           <div className="mt-3 hidden border-y border-zinc-100 bg-zinc-50/60 md:grid md:grid-cols-2">
             <p className="border-r border-zinc-100 px-3 py-1.5 text-[11px] font-medium text-zinc-500">
-              System
+              Systemvy
             </p>
-            <p className="px-3 py-1.5 text-[11px] font-medium text-zinc-500">Kund</p>
+            <p className="px-3 py-1.5 text-[11px] font-medium text-zinc-500">UX-vy</p>
           </div>
 
           <ul className="divide-y divide-zinc-100">
-            {items.map((item, index) => (
-              <li key={item.id} className={embedded ? "py-3" : "p-4"}>
+            {rows.map((row, index) => (
+              <li key={row.key} className={embedded ? "py-3" : "p-4"}>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-0">
                   <div className="flex flex-col gap-2 md:border-r md:border-zinc-100 md:pr-3">
-                    <p className="text-[11px] font-medium text-zinc-400">
-                      {index + 1}. {item.name}
-                    </p>
-                    <Field label="Meta i systemet">
-                      <textarea
-                        value={item.metaDescription ?? ""}
-                        onChange={(event) =>
-                          updateItem(item.id, {
-                            metaDescription: event.target.value,
-                          })
-                        }
-                        rows={2}
-                        className={textareaClass}
-                      />
-                    </Field>
-                    <button
-                      type="button"
-                      onClick={() => generateMetaForItem(item.id)}
-                      disabled={busy}
-                      className="h-8 w-fit cursor-pointer rounded-lg bg-zinc-100 px-2.5 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-200 disabled:opacity-50"
-                    >
-                      Generera
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-[11px] font-medium text-zinc-400">
+                        {index + 1}. {row.label}
+                      </p>
+                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-500">
+                        {row.productCount} prod.
+                      </span>
+                      {row.mixedSystemMeta ? (
+                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                          varierande system-meta
+                        </span>
+                      ) : null}
+                    </div>
+                    <ReadOnlyField
+                      label="System (SEO / metaDescription)"
+                      value={row.systemMeta}
+                      emptyText="Ingen SEO-meta sparad."
+                    />
                   </div>
 
                   <div className="flex flex-col gap-2 md:pl-3">
-                    <div className="flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => removeItem(item.id)}
-                        aria-label="Ta bort från listan"
-                        className="cursor-pointer text-[11px] font-medium text-zinc-400 hover:text-red-600"
-                      >
-                        Ta bort
-                      </button>
+                    <div className="flex flex-wrap items-center gap-2 md:min-h-5">
+                      {row.mixedUxMeta ? (
+                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                          varierande UX-meta
+                        </span>
+                      ) : null}
                     </div>
-                    <Field label="Meta till kund">
-                      <textarea
-                        value={item.shortDescription ?? ""}
-                        onChange={(event) =>
-                          updateItem(item.id, {
-                            shortDescription: event.target.value,
-                          })
-                        }
-                        rows={4}
-                        placeholder="Kort beskrivning som kunden ser i upphämtningsmail…"
-                        aria-describedby={`meta-hint-${item.id}`}
-                        className={textareaClass}
-                      />
-                      <span
-                        id={`meta-hint-${item.id}`}
-                        className="text-[11px] font-normal leading-5 text-zinc-400"
-                      >
-                        Visas för kunden i mailet när ordern är redo för upphämtning.
+                    <ReadOnlyField
+                      label={`UX (${activeField || "produktmeta"})`}
+                      value={row.uxMeta}
+                      emptyText="Ingen UX-meta för det här fältet."
+                    />
+                    {row.sampleProductName ? (
+                      <span className="text-[11px] leading-5 text-zinc-400">
+                        Exempelprodukt: {row.sampleProductName}
                       </span>
-                    </Field>
+                    ) : null}
                   </div>
                 </div>
               </li>
             ))}
           </ul>
-
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-3">
-            <button
-              type="button"
-              onClick={generateAllMeta}
-              disabled={busy}
-              className="h-8 cursor-pointer rounded-lg px-2 text-xs font-medium text-zinc-600 hover:bg-zinc-100 disabled:opacity-50"
-            >
-              Generera alla
-            </button>
-            <button
-              type="button"
-              onClick={() => void saveBatch()}
-              disabled={busy}
-              className="h-8 cursor-pointer rounded-lg bg-accent px-4 text-xs font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
-            >
-              {saving ? "Sparar…" : "Spara"}
-            </button>
-          </div>
         </>
+      ) : loaded ? (
+        <p className="mt-2 text-center text-xs text-zinc-400">
+          Inga träffar för fältet ”{activeField}”.
+        </p>
       ) : embedded ? (
         <p className="mt-2 text-center text-xs text-zinc-400">
-          Hämta produkter för att redigera meta.
+          Skriv ett JSON-fält och klicka Hämta meta för att förhandsgranska.
         </p>
       ) : (
         <p className="px-4 py-10 text-center text-sm text-zinc-400">
-          Välj butik och hämta produkter.
+          Välj butik, skriv JSON-fält och hämta meta.
         </p>
       )}
     </>
@@ -357,20 +326,23 @@ export function WooMetaBatchPanel({
   );
 }
 
-function Field({
+function ReadOnlyField({
   label,
-  children,
+  value,
+  emptyText,
 }: {
   label: string;
-  children: ReactNode;
+  value: string | null;
+  emptyText: string;
 }) {
   return (
-    <label className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1">
       <span className="text-[11px] font-medium text-zinc-500">{label}</span>
-      {children}
-    </label>
+      <div className="min-h-20 rounded-xl bg-zinc-100/80 px-3 py-2 text-sm leading-6 text-zinc-800">
+        {value?.trim() ? value : (
+          <span className="text-zinc-400">{emptyText}</span>
+        )}
+      </div>
+    </div>
   );
 }
-
-const textareaClass =
-  "w-full resize-y rounded-xl border-0 bg-zinc-100/80 px-3 py-2 text-sm text-zinc-900 outline-none transition focus:bg-white focus:ring-2 focus:ring-zinc-200";

@@ -36,6 +36,46 @@ export function decryptSecret(value: string): string {
   ]).toString("utf8");
 }
 
+/** Maskerad visning: stjärnor + sista fyra tecken (t.ex. ************6334). */
+export function maskSecretLastFour(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const tail = trimmed.slice(-4);
+  const hiddenLength = Math.max(trimmed.length - 4, 12);
+  return "*".repeat(hiddenLength) + tail;
+}
+
+export function previewSecretLastFour(
+  encrypted: string | null | undefined,
+): string | null {
+  if (!encrypted) {
+    return null;
+  }
+
+  try {
+    const masked = maskSecretLastFour(decryptSecret(encrypted));
+    return masked || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Tom sträng = behåll sparad nyckel (ignorera maskerad visning i fältet). */
+export function normalizeSecretFormValue(
+  raw: FormDataEntryValue | null | undefined,
+  savedMask: string | null,
+): string {
+  const value = String(raw ?? "").trim();
+  if (!value || (savedMask && value === savedMask)) {
+    return "";
+  }
+
+  return value;
+}
+
 function encryptionKey(): Buffer {
   const secret =
     process.env.AUTH_SECRET ??
