@@ -7,6 +7,7 @@ import type { Store } from "@/generated/prisma/client";
 import type { WooWebhookMode } from "@/lib/woo-webhook-config";
 import { formatWooJsonForEditor } from "@/lib/product-woo-json";
 import { normalizeSecretFormValue } from "@/lib/secret-crypto";
+import { WooLogo } from "@/components/branding/WooLogo";
 import { WooMetaBatchPanel } from "@/components/products/WooMetaBatchPanel";
 import { useToast } from "@/components/ui/ToastProvider";
 
@@ -59,24 +60,24 @@ const SECTION_STYLES: Record<
   }
 > = {
   butik: {
-    activeSurface: "bg-gradient-to-br from-violet-50 via-white to-fuchsia-50/40",
-    activeBorder: "border-violet-200/90 shadow-md shadow-violet-100/80",
-    icon: "bg-violet-100 text-violet-700",
-    iconActive: "bg-violet-600 text-white shadow-md shadow-violet-200",
-    title: "text-violet-950",
-    bar: "bg-violet-500",
+    activeSurface: "bg-gradient-to-br from-rose-50 via-white to-orange-50/30",
+    activeBorder: "border-rose-200/90 shadow-md shadow-rose-100/80",
+    icon: "bg-rose-100 text-rose-700",
+    iconActive: "bg-rose-600 text-white shadow-md shadow-rose-200",
+    title: "text-rose-950",
+    bar: "bg-rose-500",
     mobileHeader:
-      "border-violet-200/80 bg-gradient-to-br from-violet-50 via-white to-white",
+      "border-rose-200/80 bg-gradient-to-br from-rose-50 via-white to-white",
   },
   woocommerce: {
-    activeSurface: "bg-gradient-to-br from-orange-50 via-white to-amber-50/50",
-    activeBorder: "border-orange-200/90 shadow-md shadow-orange-100/80",
-    icon: "bg-orange-100 text-orange-700",
-    iconActive: "bg-orange-500 text-white shadow-md shadow-orange-200",
-    title: "text-orange-950",
-    bar: "bg-orange-500",
+    activeSurface: "bg-gradient-to-br from-[#F5F0FF] via-white to-white",
+    activeBorder: "border-[#D1C1FF]/90 shadow-md shadow-[#873EFF]/10",
+    icon: "bg-[#EDE5FF]",
+    iconActive: "bg-[#873EFF] shadow-md shadow-[#873EFF]/30",
+    title: "text-[#5007AA]",
+    bar: "bg-[#873EFF]",
     mobileHeader:
-      "border-orange-200/80 bg-gradient-to-br from-orange-50 via-white to-white",
+      "border-[#D1C1FF]/80 bg-gradient-to-br from-[#F5F0FF] via-white to-white",
   },
   epost: {
     activeSurface: "bg-gradient-to-br from-sky-50 via-white to-blue-50/40",
@@ -399,7 +400,7 @@ export function StoreSettingsForm({
               <span
                 className={`flex size-11 shrink-0 items-center justify-center rounded-2xl ${activeSectionStyle.iconActive}`}
               >
-                <SettingsSectionIcon section={activeSection} />
+                <SettingsSectionIcon section={activeSection} active />
               </span>
               <div className="min-w-0">
                 <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-400">
@@ -580,7 +581,7 @@ function SettingsSectionNav({
                         active ? style.iconActive : style.icon
                       }`}
                     >
-                      <SettingsSectionIcon section={section.id} />
+                      <SettingsSectionIcon section={section.id} active={active} />
                     </span>
                     <span className="min-w-0">
                       <span
@@ -611,7 +612,13 @@ function SettingsSectionNav({
   );
 }
 
-function SettingsSectionIcon({ section }: { section: SettingsSectionId }) {
+function SettingsSectionIcon({
+  section,
+  active = false,
+}: {
+  section: SettingsSectionId;
+  active?: boolean;
+}) {
   const className = "size-5";
 
   switch (section) {
@@ -627,17 +634,7 @@ function SettingsSectionIcon({ section }: { section: SettingsSectionId }) {
         </svg>
       );
     case "woocommerce":
-      return (
-        <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden>
-          <path
-            d="M4 5.5h12M4 10h12M4 14.5h7"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-          <circle cx="14.5" cy="14.5" r="2" stroke="currentColor" strokeWidth="1.5" />
-        </svg>
-      );
+      return <WooLogo inverted={active} className="h-[11px] w-auto" />;
     case "epost":
       return (
         <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden>
@@ -749,11 +746,16 @@ function IntegrationCard({
   return (
     <section className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
-        <div>
-          <h3 className="text-sm font-bold text-zinc-950">WooCommerce</h3>
-          <p className="mt-0.5 text-xs text-zinc-500">
-            API, webhooks, produktmeta och JSON från butiken.
-          </p>
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[#EDE5FF]">
+            <WooLogo className="h-[13px] w-auto" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-zinc-950">WooCommerce</h3>
+            <p className="mt-0.5 text-xs text-zinc-500">
+              API, webhooks, produktmeta och JSON från butiken.
+            </p>
+          </div>
         </div>
         <span
           className={`rounded-full px-2 py-1 text-[10px] font-bold ${
