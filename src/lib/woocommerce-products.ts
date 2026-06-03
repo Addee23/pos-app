@@ -5,6 +5,7 @@ import {
   extractWooCountry,
 } from "@/lib/woo-product-taxonomy";
 import { inferProductTaxonomy } from "@/lib/product-taxonomy-options";
+import { extractWooProductMetadata } from "@/lib/woo-product-metadata";
 
 export type WooProductImportInput = {
   products: unknown[];
@@ -28,6 +29,7 @@ export type ImportedWooProduct = {
   category: string | null;
   brand: string | null;
   country: string | null;
+  wooMetadata: Record<string, unknown>;
   variants: ImportedWooVariant[];
 };
 
@@ -91,6 +93,7 @@ export async function normalizeWooProducts({
       category,
       brand,
       country,
+      wooMetadata: extractWooProductMetadata(product),
       variants: variationDetails.map((variant, index) =>
         normalizeVariant(variant, product, index),
       ),

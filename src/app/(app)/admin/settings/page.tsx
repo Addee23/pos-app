@@ -5,6 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { AdminDashboardLink } from "@/components/layout/AdminDashboardLink";
 import { StoreSettingsForm } from "@/components/settings/StoreSettingsForm";
 import { getWooWebhookMode } from "@/lib/woo-webhook-config";
+import {
+  maskSecretLastFour,
+  previewSecretLastFour,
+} from "@/lib/secret-crypto";
 
 type SettingsPageProps = {
   searchParams: Promise<{ storeId?: string; section?: string }>;
@@ -71,6 +75,26 @@ export default async function AdminSettingsPage({
     redirect("/admin/settings");
   }
 
+  const envStoreSlug = process.env.IMPORT_STORE_SLUG ?? "demo-butik";
+  const useEnvKeyFallback = store.slug === envStoreSlug;
+
+  function previewStoredSecret(
+    encrypted: string | null,
+    envValue: string | undefined,
+  ): string | null {
+    const fromDatabase = previewSecretLastFour(encrypted);
+    if (fromDatabase) {
+      return fromDatabase;
+    }
+
+    if (!useEnvKeyFallback) {
+      return null;
+    }
+
+    const plain = envValue?.trim();
+    return plain ? maskSecretLastFour(plain) : null;
+  }
+
   return (
     <section className="flex flex-col gap-4">
       <AdminDashboardLink />
@@ -88,6 +112,20 @@ export default async function AdminSettingsPage({
       <StoreSettingsForm
         stores={stores}
         store={store}
+        wooSecretPreviews={{
+          consumerKey: previewStoredSecret(
+            store.wooConsumerKey,
+            process.env.WOO_CONSUMER_KEY,
+          ),
+          consumerSecret: previewStoredSecret(
+            store.wooConsumerSecret,
+            process.env.WOO_CONSUMER_SECRET,
+          ),
+          webhookSecret: previewStoredSecret(
+            store.wooWebhookSecret,
+            process.env.WOO_WEBHOOK_SECRET,
+          ),
+        }}
         baseUrl={baseUrl}
         webhookMode={getWooWebhookMode()}
         initialSection={section}

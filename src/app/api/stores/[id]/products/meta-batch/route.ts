@@ -6,6 +6,11 @@ import {
   unauthorized,
 } from "@/lib/api-errors";
 import { prisma } from "@/lib/prisma";
+import {
+  buildStoredMetaPreviewRows,
+  collectAvailableMetaKeys,
+  normalizeWooMetaFieldInput,
+} from "@/lib/woo-meta-preview";
 import { isAdmin } from "../../../../../../../rbac";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -34,7 +39,19 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  const limit = parseLimit(new URL(request.url).searchParams.get("limit"));
+  const field = normalizeWooMetaFieldInput(
+    new URL(request.url).searchParams.get("field") ?? "",
+  );
+
+  if (!field) {
+    return NextResponse.json(
+      {
+        error:
+          "Ange vilket meta-fält du vill söka på, t.ex. land, format eller smak.",
+      },
+      { status: 400 },
+    );
+  }
 
   const store = await prisma.store.findUnique({
     where: { id },
@@ -47,33 +64,34 @@ export async function GET(request: Request, context: RouteContext) {
 
   const products = await prisma.product.findMany({
     where: { storeId: id },
-    orderBy: { updatedAt: "desc" },
-    take: limit,
+    orderBy: { name: "asc" },
     select: {
-      id: true,
       name: true,
-      shortDescription: true,
       metaDescription: true,
-      wooProductId: true,
-      category: true,
-      brand: true,
-      country: true,
+      shortDescription: true,
+      wooMetadata: true,
     },
   });
+
+  const availableFields = collectAvailableMetaKeys(products);
+  const rows = buildStoredMetaPreviewRows(products, field);
+  const productsWithMetadata = products.filter((product) => {
+    return (
+      product.wooMetadata &&
+      typeof product.wooMetadata === "object" &&
+      !Array.isArray(product.wooMetadata) &&
+      Object.keys(product.wooMetadata as Record<string, unknown>).length > 0
+    );
+  }).length;
 
   return NextResponse.json({
     storeId: store.id,
     storeName: store.name,
-    limit,
-    items: products,
+    field,
+    source: "database",
+    productCount: products.length,
+    productsWithMetadata,
+    availableFields,
+    rows,
   });
-}
-
-function parseLimit(value: string | null): number {
-  const limit = Number(value);
-  if (!Number.isInteger(limit) || limit < 1) {
-    return 10;
-  }
-
-  return Math.min(limit, 10);
 }

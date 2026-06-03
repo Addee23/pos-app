@@ -1,4 +1,12 @@
 import { z } from "zod";
+import { META_BATCH_GROUP_BY } from "@/lib/meta-batch";
+
+const nullableMetaField = z
+  .string()
+  .trim()
+  .nullable()
+  .optional()
+  .transform((value) => value ?? null);
 
 export const productMetaUpdateSchema = z.object({
   shortDescription: z
@@ -14,24 +22,15 @@ export const productMetaUpdateSchema = z.object({
 });
 
 export const productMetaBatchSaveSchema = z.object({
-  items: z
+  groupBy: z.enum(META_BATCH_GROUP_BY),
+  rows: z
     .array(
       z.object({
-        id: z.string().min(1),
-        shortDescription: z
-          .string()
-          .trim()
-          .nullable()
-          .optional()
-          .transform((value) => value ?? null),
-        metaDescription: z
-          .string()
-          .trim()
-          .nullable()
-          .optional()
-          .transform((value) => value ?? null),
+        key: z.string(),
+        shortDescription: nullableMetaField,
+        metaDescription: nullableMetaField,
       }),
     )
     .min(1)
-    .max(10),
+    .max(100),
 });

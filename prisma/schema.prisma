@@ -97,6 +97,8 @@ model Product {
   category      String?
   brand         String?
   country       String?
+  /** Filtrerad produktmeta från Woo (utan rank_math, qoc_, _jet osv). */
+  wooMetadata   Json?
   stockQuantity Int         @default(0)
   stockLocation String?
   createdAt     DateTime    @default(now())

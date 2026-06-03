@@ -6,6 +6,7 @@ import { useMemo, useId, useRef, useState } from "react";
 import type { Store } from "@/generated/prisma/client";
 import type { WooWebhookMode } from "@/lib/woo-webhook-config";
 import { formatWooJsonForEditor } from "@/lib/product-woo-json";
+import { normalizeSecretFormValue } from "@/lib/secret-crypto";
 import { WooMetaBatchPanel } from "@/components/products/WooMetaBatchPanel";
 import { useToast } from "@/components/ui/ToastProvider";
 
@@ -114,6 +115,12 @@ function parseSettingsSection(value: string | undefined): SettingsSectionId {
 
 type StoreOption = Pick<Store, "id" | "name">;
 
+export type WooSecretPreviews = {
+  consumerKey: string | null;
+  consumerSecret: string | null;
+  webhookSecret: string | null;
+};
+
 type EditableStore = Pick<
   Store,
   | "id"
@@ -141,6 +148,7 @@ type EditableStore = Pick<
 type StoreSettingsFormProps = {
   stores: StoreOption[];
   store: EditableStore;
+  wooSecretPreviews: WooSecretPreviews;
   baseUrl: string;
   webhookMode: WooWebhookMode;
   initialSection?: string;
@@ -149,6 +157,7 @@ type StoreSettingsFormProps = {
 export function StoreSettingsForm({
   stores,
   store,
+  wooSecretPreviews,
   baseUrl,
   webhookMode,
   initialSection,
@@ -245,9 +254,18 @@ export function StoreSettingsForm({
       name: formData.get("name"),
       logoUrl: formData.get("logoUrl"),
       wooUrl: formData.get("wooUrl"),
-      wooConsumerKey: formData.get("wooConsumerKey"),
-      wooConsumerSecret: formData.get("wooConsumerSecret"),
-      wooWebhookSecret: formData.get("wooWebhookSecret"),
+      wooConsumerKey: normalizeSecretFormValue(
+        formData.get("wooConsumerKey"),
+        wooSecretPreviews.consumerKey,
+      ),
+      wooConsumerSecret: normalizeSecretFormValue(
+        formData.get("wooConsumerSecret"),
+        wooSecretPreviews.consumerSecret,
+      ),
+      wooWebhookSecret: normalizeSecretFormValue(
+        formData.get("wooWebhookSecret"),
+        wooSecretPreviews.webhookSecret,
+      ),
       smtpHost: formData.get("smtpHost"),
       smtpPort: formData.get("smtpPort"),
       smtpSecure: formData.get("smtpSecure") === "on",
@@ -433,6 +451,7 @@ export function StoreSettingsForm({
           >
             <IntegrationCard
               store={store}
+              wooSecretPreviews={wooSecretPreviews}
               webhookMode={webhookMode}
               webhookSecret={webhookSecret}
               webhookUrls={webhookUrls}
@@ -662,6 +681,7 @@ function SettingsSectionIcon({ section }: { section: SettingsSectionId }) {
 
 function IntegrationCard({
   store,
+  wooSecretPreviews,
   webhookMode,
   webhookSecret,
   webhookUrls,
@@ -671,6 +691,7 @@ function IntegrationCard({
   onCopy,
 }: {
   store: EditableStore;
+  wooSecretPreviews: WooSecretPreviews;
   webhookMode: WooWebhookMode;
   webhookSecret: string;
   webhookUrls: { id: string; label: string; url: string }[];
@@ -773,34 +794,63 @@ function IntegrationCard({
 
         <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
           <Field
-            label={`WooCommerce URL${store.wooUrl ? " · installerad" : ""}`}
+            label="WooCommerce URL"
             name="wooUrl"
             type="url"
             defaultValue={store.wooUrl ?? ""}
             placeholder="https://dinbutik.se"
             hint="Butikens WooCommerce-adress utan /wp-admin."
           />
-          <Field
-            label={`Consumer Key${store.wooConsumerKey ? " · installerad" : " · inte installerad"}`}
-            name="wooConsumerKey"
-            placeholder="ck_xxxxxxxxxxxxxxxx"
-            hint="Lämna tomt för att behålla sparad nyckel."
-          />
-          <Field
-            label={`Consumer Secret${store.wooConsumerSecret ? " · installerad" : " · inte installerad"}`}
-            name="wooConsumerSecret"
-            placeholder="cs_xxxxxxxxxxxxxxxx"
-            hint="Lämna tomt för att behålla sparad hemlighet."
-          />
-          <div className="grid grid-cols-[1fr_auto] items-end gap-2">
-            <Field
-              label={`Webhook Secret${store.wooWebhookSecret ? " · installerad" : " · inte installerad"}`}
-              name="wooWebhookSecret"
-              value={webhookSecret}
-              onChangeValue={onWebhookSecretChange}
-              placeholder="Generera eller klistra in"
-              hint="Samma secret används på båda webhooks i WooCommerce."
+          {wooSecretPreviews.consumerKey ? (
+            <StoredSecretField
+              label="Consumer Key"
+              name="wooConsumerKey"
+              savedMask={wooSecretPreviews.consumerKey}
+              hint="Klicka i fältet och skriv ny nyckel för att byta."
             />
+          ) : (
+            <Field
+              label="Consumer Key"
+              name="wooConsumerKey"
+              placeholder="ck_..."
+              hint="Klistra in consumer key från WooCommerce."
+            />
+          )}
+          {wooSecretPreviews.consumerSecret ? (
+            <StoredSecretField
+              label="Consumer Secret"
+              name="wooConsumerSecret"
+              savedMask={wooSecretPreviews.consumerSecret}
+              hint="Klicka i fältet och skriv ny hemlighet för att byta."
+            />
+          ) : (
+            <Field
+              label="Consumer Secret"
+              name="wooConsumerSecret"
+              placeholder="cs_..."
+              hint="Klistra in consumer secret från WooCommerce."
+            />
+          )}
+          <div className="grid grid-cols-[1fr_auto] items-end gap-2">
+            {wooSecretPreviews.webhookSecret ? (
+              <StoredSecretField
+                label="Webhook Secret"
+                name="wooWebhookSecret"
+                savedMask={wooSecretPreviews.webhookSecret}
+                value={webhookSecret}
+                onChangeValue={onWebhookSecretChange}
+                hint="Samma secret används på båda webhooks i WooCommerce."
+              />
+            ) : (
+              <Field
+                label="Webhook Secret"
+                name="wooWebhookSecret"
+                value={webhookSecret}
+                onChangeValue={onWebhookSecretChange}
+                placeholder="Generera eller klistra in"
+                hint="Samma secret används på båda webhooks i WooCommerce."
+              />
+            )}
             <button
               type="button"
               onClick={onGenerateSecret}
@@ -844,7 +894,11 @@ function IntegrationCard({
         </div>
 
         <div className="mt-5 border-t border-zinc-100 pt-4">
-          <WooMetaBatchPanel lockStoreId={store.id} embedded />
+          <WooMetaBatchPanel
+            lockStoreId={store.id}
+            lockStoreName={store.name}
+            embedded
+          />
         </div>
 
         <div className="mt-4 border-t border-zinc-100 pt-4">
@@ -1001,6 +1055,80 @@ function SettingsCard({
       </div>
       {children}
     </section>
+  );
+}
+
+function StoredSecretField({
+  label,
+  name,
+  savedMask,
+  hint,
+  value,
+  onChangeValue,
+}: {
+  label: string;
+  name: string;
+  savedMask: string;
+  hint?: string;
+  value?: string;
+  onChangeValue?: (value: string) => void;
+}) {
+  const controlled = value !== undefined;
+  const generatedId = useId();
+  const inputId = `${name}-${generatedId}`;
+  const hintId = hint ? `${inputId}-hint` : undefined;
+  const [draft, setDraft] = useState("");
+  const [editing, setEditing] = useState(false);
+
+  const hasActiveEntry = Boolean(draft || (controlled && value));
+  const showingSavedMask = Boolean(savedMask && !editing && !hasActiveEntry);
+  const displayValue = showingSavedMask
+    ? savedMask!
+    : controlled
+      ? draft || value || ""
+      : draft;
+
+  function handleFocus() {
+    setEditing(true);
+    setDraft("");
+  }
+
+  function handleBlur() {
+    setEditing(false);
+    if (!draft.trim()) {
+      setDraft("");
+    }
+  }
+
+  function handleChange(nextValue: string) {
+    setDraft(nextValue);
+    if (controlled) {
+      onChangeValue?.(nextValue);
+    }
+  }
+
+  return (
+    <label htmlFor={inputId} className="flex flex-col gap-1 text-sm font-semibold text-zinc-700">
+      {label}
+      <input
+        id={inputId}
+        name={name}
+        type="text"
+        autoComplete="off"
+        spellCheck={false}
+        value={displayValue}
+        aria-describedby={hintId}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        onChange={(event) => handleChange(event.target.value)}
+        className="min-h-12 cursor-text rounded-2xl border border-zinc-200 bg-white px-3 font-mono text-base font-normal tracking-wide text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10"
+      />
+      {hint ? (
+        <span id={hintId} className="text-xs font-normal leading-5 text-zinc-500">
+          {hint}
+        </span>
+      ) : null}
+    </label>
   );
 }
 
