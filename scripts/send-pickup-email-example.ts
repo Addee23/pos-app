@@ -6,7 +6,7 @@
 import "dotenv/config";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { PickupStatus, PrismaClient } from "../src/generated/prisma/client";
-import { autoNotifyPickupReady } from "../src/lib/pickup-notifications";
+import { markPickupAsPacked } from "../src/lib/pickup-notifications";
 
 import { DEFAULT_TEST_PICKUP_ADDRESS } from "../src/lib/constants/pickup";
 
@@ -87,14 +87,25 @@ async function main() {
     importedProducts.map((p) => p.name).join(", "),
   );
 
+  const admin = await prisma.user.findFirst({
+    where: { role: "ADMIN" },
+    select: { id: true },
+  });
+
+  if (!admin) {
+    throw new Error("Ingen admin hittades. Kör: npm run db:seed");
+  }
+
   const pickup = await prisma.pickup.upsert({
     where: {
       storeId_pickupCode: { storeId: store.id, pickupCode: "EXEMPEL-MAPS" },
     },
     update: {
       customerEmail: TEST_EMAIL,
-      status: PickupStatus.READY,
+      status: PickupStatus.AWAITING_PACK,
       readyEmailSentAt: null,
+      packedAt: null,
+      packedById: null,
       customerName: "Exempel Kund",
     },
     create: {
@@ -102,7 +113,7 @@ async function main() {
       customerName: "Exempel Kund",
       customerEmail: TEST_EMAIL,
       pickupCode: "EXEMPEL-MAPS",
-      status: PickupStatus.READY,
+      status: PickupStatus.AWAITING_PACK,
       notes: "Exempelorder – test av bild, produktinfo och karta.",
     },
   });
@@ -125,12 +136,12 @@ async function main() {
     });
   }
 
-  const result = await autoNotifyPickupReady(pickup.id);
+  const result = await markPickupAsPacked(pickup.id, admin.id);
   console.log("\nUpphämtningskod: EXEMPEL-MAPS");
   console.log("Mail till:", TEST_EMAIL);
   console.log("Resultat:", result.status, result);
 
-  if (result.status === "sent") {
+  if (result.status === "packed" && result.readyEmailSentAt) {
     console.log(
       "\nKlart! Öppna inkorgen (och skräppost). Mailet ska visa produktbilder, beskrivning och karta.",
     );

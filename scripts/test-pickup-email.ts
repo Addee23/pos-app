@@ -1,11 +1,11 @@
 /**
- * Testar hela flödet: redo-order → mail till kundens e-post.
+ * Testar hela flödet: packa order → mail till kundens e-post.
  * Kör: npm run test:pickup-email
  */
 import "dotenv/config";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { PickupStatus, PrismaClient } from "../src/generated/prisma/client";
-import { autoNotifyPickupReady } from "../src/lib/pickup-notifications";
+import { markPickupAsPacked } from "../src/lib/pickup-notifications";
 
 const TEST_CUSTOMER_EMAIL =
   process.env.TEST_CUSTOMER_EMAIL ?? "adiiinaaaa86@gmail.com";
@@ -31,13 +31,22 @@ function createPrismaClient() {
 async function main() {
   const prisma = createPrismaClient();
 
+  const admin = await prisma.user.findFirst({
+    where: { role: "ADMIN" },
+    select: { id: true, email: true },
+  });
+
+  if (!admin) {
+    throw new Error("Ingen admin-användare hittades. Kör: npm run db:seed");
+  }
+
   const pickups = await prisma.pickup.findMany({
-    where: { status: PickupStatus.READY },
+    where: { status: PickupStatus.AWAITING_PACK },
     select: { id: true, pickupCode: true, customerEmail: true },
   });
 
   if (pickups.length === 0) {
-    console.log("Inga redo-order hittades. Kör först: npm run db:seed");
+    console.log("Inga order som väntar på packning. Kör först: npm run db:seed");
     return;
   }
 
@@ -50,11 +59,13 @@ async function main() {
       data: {
         customerEmail: TEST_CUSTOMER_EMAIL,
         readyEmailSentAt: null,
-        status: PickupStatus.READY,
+        status: PickupStatus.AWAITING_PACK,
+        packedAt: null,
+        packedById: null,
       },
     });
 
-    const result = await autoNotifyPickupReady(pickup.id);
+    const result = await markPickupAsPacked(pickup.id, admin.id);
     console.log(`${pickup.pickupCode}: ${result.status}`, result);
   }
 

@@ -8,6 +8,7 @@ import { resolvePickupAddress } from "@/lib/constants/pickup";
 import {
   mapPickupItemsToEmailItems,
   pickupEmailItemsInclude,
+  type PickupItemForEmail,
 } from "@/lib/pickup-email-items";
 import { syncPickupItemsFromCatalog } from "@/lib/pickup-catalog-sync";
 import { prisma } from "@/lib/prisma";
@@ -30,41 +31,88 @@ const pickupEmailInclude = {
     },
   },
   items: pickupEmailItemsInclude,
-};
+} as const;
 
 export type NotifyPickupReadyResult =
   | { status: "sent"; readyEmailSentAt: Date }
   | { status: "skipped"; reason: string }
   | { status: "error"; message: string };
 
-/** Anropas när en order blir redo för upphämtning (status READY). */
-export async function autoNotifyPickupReady(
-  pickupId: string,
-): Promise<NotifyPickupReadyResult> {
-  return notifyPickupReady(pickupId);
-}
+export type MarkPickupPackedResult =
+  | { status: "packed"; readyEmailSentAt: Date | null }
+  | { status: "skipped"; reason: string }
+  | { status: "error"; message: string };
 
-/** Skickar mail för alla redo-order i butiken som ännu inte fått bekräftelse. */
-export async function processPendingPickupEmails(
-  storeId: string,
-): Promise<NotifyPickupReadyResult[]> {
-  const pending = await prisma.pickup.findMany({
-    where: {
-      storeId,
-      status: PickupStatus.READY,
-      customerEmail: { not: null },
-      readyEmailSentAt: null,
-    },
-    select: { id: true },
+/** Personal markerar order som packad → mejl skickas → status blir READY. */
+export async function markPickupAsPacked(
+  pickupId: string,
+  packedById: string,
+): Promise<MarkPickupPackedResult> {
+  const pickup = await prisma.pickup.findUnique({
+    where: { id: pickupId },
+    include: pickupEmailInclude,
   });
 
-  const results: NotifyPickupReadyResult[] = [];
-  for (const pickup of pending) {
-    results.push(await notifyPickupReady(pickup.id));
+  if (!pickup) {
+    return { status: "error", message: "Upphämtningen hittades inte" };
   }
-  return results;
+
+  if (pickup.status !== PickupStatus.AWAITING_PACK) {
+    return {
+      status: "skipped",
+      reason: "Ordern väntar inte på packning",
+    };
+  }
+
+  try {
+    await syncPickupItemsFromCatalog(pickup.id);
+
+    const refreshed = await prisma.pickup.findUnique({
+      where: { id: pickup.id },
+      include: pickupEmailInclude,
+    });
+
+    if (!refreshed) {
+      return { status: "error", message: "Upphämtningen hittades inte" };
+    }
+
+    let readyEmailSentAt: Date | null = null;
+
+    if (refreshed.customerEmail) {
+      const emailResult = await sendPickupReadyEmailForPickup(refreshed);
+      if (emailResult.status === "error") {
+        return emailResult;
+      }
+      readyEmailSentAt = emailResult.readyEmailSentAt;
+    }
+
+    const packedAt = new Date();
+
+    await prisma.pickup.update({
+      where: { id: refreshed.id },
+      data: {
+        status: PickupStatus.READY,
+        packedAt,
+        packedById,
+        readyEmailSentAt,
+      },
+    });
+
+    return { status: "packed", readyEmailSentAt };
+  } catch (error) {
+    if (error instanceof MailConfigurationError) {
+      return { status: "error", message: error.message };
+    }
+
+    console.error("markPickupAsPacked failed", error);
+    return {
+      status: "error",
+      message: "Kunde inte markera ordern som packad",
+    };
+  }
 }
 
+/** Skickar om bekräftelsemail för redan packade order (READY). */
 export async function notifyPickupReady(
   pickupId: string,
   options?: { force?: boolean },
@@ -100,56 +148,18 @@ export async function notifyPickupReady(
   }
 
   try {
-    await syncPickupItemsFromCatalog(pickup.id);
+    const emailResult = await sendPickupReadyEmailForPickup(pickup);
 
-    const refreshed = await prisma.pickup.findUnique({
-      where: { id: pickup.id },
-      include: pickupEmailInclude,
-    });
-
-    if (!refreshed) {
-      return { status: "error", message: "Upphämtningen hittades inte" };
+    if (emailResult.status === "error") {
+      return emailResult;
     }
-
-    const smtpConfig = resolveSmtpConfig(refreshed.store);
-    const resolvedAddress = resolvePickupAddress(refreshed.store.address);
-
-    if (!refreshed.store.address?.trim()) {
-      const pickupStore = await prisma.pickup.findUnique({
-        where: { id: refreshed.id },
-        select: { storeId: true },
-      });
-      if (pickupStore) {
-        await prisma.store.update({
-          where: { id: pickupStore.storeId },
-          data: { address: resolvedAddress },
-        });
-      }
-    }
-
-    await sendPickupReadyEmail(
-      {
-        customerEmail: refreshed.customerEmail,
-        customerName: refreshed.customerName,
-        pickupCode: refreshed.pickupCode,
-        notes: refreshed.notes,
-        store: {
-          ...refreshed.store,
-          address: resolvedAddress,
-        },
-        items: mapPickupItemsToEmailItems(refreshed.items),
-      },
-      smtpConfig,
-    );
-
-    const readyEmailSentAt = new Date();
 
     await prisma.pickup.update({
-      where: { id: refreshed.id },
-      data: { readyEmailSentAt },
+      where: { id: pickup.id },
+      data: { readyEmailSentAt: emailResult.readyEmailSentAt },
     });
 
-    return { status: "sent", readyEmailSentAt };
+    return emailResult;
   } catch (error) {
     if (error instanceof MailConfigurationError) {
       return { status: "error", message: error.message };
@@ -161,4 +171,66 @@ export async function notifyPickupReady(
       message: "Kunde inte skicka bekräftelsemail",
     };
   }
+}
+
+async function sendPickupReadyEmailForPickup(
+  pickup: {
+    id: string;
+    customerEmail: string | null;
+    customerName: string;
+    pickupCode: string;
+    notes: string | null;
+    store: {
+      name: string;
+      address: string | null;
+      logoUrl: string | null;
+      thankYouMessage: string | null;
+      returnText: string | null;
+      receiptFooter: string | null;
+      smtpHost: string | null;
+      smtpPort: number | null;
+      smtpSecure: boolean;
+      smtpUser: string | null;
+      smtpPass: string | null;
+      smtpFrom: string | null;
+    };
+    items: PickupItemForEmail[];
+  },
+): Promise<{ status: "sent"; readyEmailSentAt: Date } | { status: "error"; message: string }> {
+  if (!pickup.customerEmail) {
+    return { status: "error", message: "Kunden saknar e-postadress" };
+  }
+
+  const smtpConfig = resolveSmtpConfig(pickup.store);
+  const resolvedAddress = resolvePickupAddress(pickup.store.address);
+
+  if (!pickup.store.address?.trim()) {
+    const pickupStore = await prisma.pickup.findUnique({
+      where: { id: pickup.id },
+      select: { storeId: true },
+    });
+    if (pickupStore) {
+      await prisma.store.update({
+        where: { id: pickupStore.storeId },
+        data: { address: resolvedAddress },
+      });
+    }
+  }
+
+  await sendPickupReadyEmail(
+    {
+      customerEmail: pickup.customerEmail,
+      customerName: pickup.customerName,
+      pickupCode: pickup.pickupCode,
+      notes: pickup.notes,
+      store: {
+        ...pickup.store,
+        address: resolvedAddress,
+      },
+      items: mapPickupItemsToEmailItems(pickup.items),
+    },
+    smtpConfig,
+  );
+
+  return { status: "sent", readyEmailSentAt: new Date() };
 }

@@ -7,17 +7,16 @@ export type PickupDashboardTab = "needsHandling" | "readyForPickup";
 
 type PickupForClassification = {
   status: PickupStatus;
-  readyEmailSentAt: Date | string | null;
 };
 
-/** Redo men bekräftelsemail ännu inte skickat (eller saknar kundmail). */
+/** Woo-order mottagen — väntar på att personal packar och skickar mail. */
 export function isPickupNeedsHandling(pickup: PickupForClassification): boolean {
-  return pickup.status === "READY" && pickup.readyEmailSentAt == null;
+  return pickup.status === "AWAITING_PACK";
 }
 
-/** Redo och kunden har fått (eller ska få) bekräftelse – kan hämtas. */
+/** Packad och notifierad — kunden kan hämta. */
 export function isPickupReadyForPickup(pickup: PickupForClassification): boolean {
-  return pickup.status === "READY" && pickup.readyEmailSentAt != null;
+  return pickup.status === "READY";
 }
 
 export function classifyPickupTab(
@@ -33,6 +32,6 @@ export function classifyPickupTab(
 }
 
 export const PICKUP_TAB_LABELS: Record<PickupDashboardTab, string> = {
-  needsHandling: "Behöver hanteras",
+  needsHandling: "Ska packas",
   readyForPickup: "Redo att hämtas",
 };

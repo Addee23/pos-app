@@ -52,6 +52,13 @@ export async function processWooOrderWebhook(
     };
   }
 
+  if (!isWooWebhookTestMode() && !isProcessingOrder(order)) {
+    return {
+      status: "ignored",
+      reason: "Ordern har inte status processing i WooCommerce",
+    };
+  }
+
   const pickupCode = buildPickupCode(wooOrderId);
   const existing = await prisma.pickup.findUnique({
     where: {
@@ -94,7 +101,7 @@ export async function processWooOrderWebhook(
       customerName: customer.name,
       customerEmail: customer.email,
       pickupCode,
-      status: "READY",
+      status: "AWAITING_PACK",
       notes: buildOrderNotes(order),
       items: { create: pickupItems },
     },
@@ -107,6 +114,11 @@ export async function processWooOrderWebhook(
     pickupCode: pickup.pickupCode,
     itemCount: pickupItems.length,
   };
+}
+
+function isProcessingOrder(order: WooOrderPayload): boolean {
+  const status = asString(order.status)?.toLowerCase();
+  return status === "processing";
 }
 
 function isPickupOrder(order: WooOrderPayload): boolean {

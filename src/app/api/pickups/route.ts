@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import type { Prisma } from "@/generated/prisma/client";
+import { pickupResponseInclude } from "@/lib/pickup-serialize";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { pickupSearchSchema } from "@/lib/validations/pickup";
@@ -54,21 +55,7 @@ export async function GET(request: Request) {
       storeId: session.user.storeId,
       ...(search ? buildPickupSearchWhere(search) : {}),
     },
-    include: {
-      pickedUpBy: { select: { name: true, email: true } },
-      cancelledBy: { select: { name: true, email: true } },
-      items: {
-        orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          productName: true,
-          variantName: true,
-          productSlug: true,
-          productImageUrl: true,
-          quantity: true,
-        },
-      },
-    },
+    include: pickupResponseInclude,
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     take: 30,
   });

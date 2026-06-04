@@ -153,25 +153,23 @@ async function main() {
     },
   });
 
-  const { autoNotifyPickupReady } = await import(
-    "../src/lib/pickup-notifications"
-  );
-
   const pickupOne = await prisma.pickup.upsert({
     where: {
       storeId_pickupCode: { storeId: store.id, pickupCode: "HAMTA-1001" },
     },
     update: {
       customerEmail: "adiiinaaaa86@gmail.com",
-      status: PickupStatus.READY,
+      status: PickupStatus.AWAITING_PACK,
       readyEmailSentAt: null,
+      packedAt: null,
+      packedById: null,
     },
     create: {
       storeId: store.id,
       customerName: "Sara Kund",
       customerEmail: "adiiinaaaa86@gmail.com",
       pickupCode: "HAMTA-1001",
-      status: PickupStatus.READY,
+      status: PickupStatus.AWAITING_PACK,
       notes: "Kontrollera legitimation vid utlämning.",
     },
   });
@@ -182,15 +180,17 @@ async function main() {
     },
     update: {
       customerEmail: "adiiinaaaa86@gmail.com",
-      status: PickupStatus.READY,
+      status: PickupStatus.AWAITING_PACK,
       readyEmailSentAt: null,
+      packedAt: null,
+      packedById: null,
     },
     create: {
       storeId: store.id,
       customerName: "Ali Kund",
       customerEmail: "adiiinaaaa86@gmail.com",
       pickupCode: "HAMTA-1002",
-      status: PickupStatus.READY,
+      status: PickupStatus.AWAITING_PACK,
       notes: "Betald online.",
     },
   });
@@ -241,11 +241,7 @@ async function main() {
     ],
   });
 
-  const emailOne = await autoNotifyPickupReady(pickupOne.id);
-  const emailTwo = await autoNotifyPickupReady(pickupTwo.id);
-  console.log("- Mail HAMTA-1001:", emailOne.status, emailOne);
-  console.log("- Mail HAMTA-1002:", emailTwo.status, emailTwo);
-
+  console.log("- Test-upphämtningar: HAMTA-1001 och HAMTA-1002 (väntar på packning)");
   console.log("Seed klar!");
   console.log("- Butik:", store.name);
   console.log("- Enkel produkt:", simpleProduct.name);

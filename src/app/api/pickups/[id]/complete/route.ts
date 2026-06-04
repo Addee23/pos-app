@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { PickupStatus } from "@/generated/prisma/client";
+import { pickupResponseInclude } from "@/lib/pickup-serialize";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -55,6 +56,13 @@ export async function PATCH(_request: Request, { params }: RouteParams) {
       );
     }
 
+    if (pickup.status !== PickupStatus.READY) {
+      return NextResponse.json(
+        { error: "Ordern måste vara packad innan den kan markeras som hämtad" },
+        { status: 409 },
+      );
+    }
+
     const updatedPickup = await prisma.pickup.update({
       where: { id: pickup.id },
       data: {
@@ -62,20 +70,7 @@ export async function PATCH(_request: Request, { params }: RouteParams) {
         pickedUpAt: new Date(),
         pickedUpById: session.user.id,
       },
-      include: {
-        pickedUpBy: { select: { name: true, email: true } },
-        items: {
-          orderBy: { createdAt: "asc" },
-          select: {
-            id: true,
-            productName: true,
-            variantName: true,
-            productSlug: true,
-            productImageUrl: true,
-            quantity: true,
-          },
-        },
-      },
+      include: pickupResponseInclude,
     });
 
     return NextResponse.json(updatedPickup);

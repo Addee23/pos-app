@@ -26,6 +26,7 @@ enum StockMovementType {
 }
 
 enum PickupStatus {
+  AWAITING_PACK
   READY
   PICKED_UP
   CANCELLED
@@ -79,6 +80,7 @@ model User {
   stockMovements StockMovement[]
   pickedUpPickups Pickup[]        @relation("PickupPickedUpBy")
   cancelledPickups Pickup[]        @relation("PickupCancelledBy")
+  packedPickups   Pickup[]        @relation("PickupPackedBy")
 }
 
 model Product {
@@ -213,9 +215,11 @@ model Pickup {
   customerName String
   customerEmail String?
   pickupCode   String
-  status       PickupStatus @default(READY)
+  status       PickupStatus @default(AWAITING_PACK)
   notes        String?
   readyEmailSentAt DateTime?
+  packedAt     DateTime?
+  packedById   String?
   pickedUpAt   DateTime?
   pickedUpById String?
   cancelledAt  DateTime?
@@ -224,6 +228,7 @@ model Pickup {
   updatedAt    DateTime     @updatedAt
 
   store      Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  packedBy   User? @relation("PickupPackedBy", fields: [packedById], references: [id], onDelete: SetNull)
   pickedUpBy User? @relation("PickupPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
   cancelledBy User? @relation("PickupCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
   items      PickupItem[]

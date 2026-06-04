@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { serializePickup, type SerializedPickup } from "@/lib/pickup-serialize";
 
 const pickupInclude = {
+  packedBy: { select: { name: true, email: true } },
   pickedUpBy: { select: { name: true, email: true } },
   cancelledBy: { select: { name: true, email: true } },
   items: {
@@ -32,28 +33,25 @@ export type PickupDashboardPayload = {
 export async function loadPickupDashboard(
   storeId: string,
 ): Promise<PickupDashboardPayload> {
+  const awaitingWhere = { storeId, status: PickupStatus.AWAITING_PACK };
   const readyWhere = { storeId, status: PickupStatus.READY };
 
   const [needsHandlingRows, readyForPickupRows, needsHandlingCount, readyForPickupCount] =
     await Promise.all([
       prisma.pickup.findMany({
-        where: { ...readyWhere, readyEmailSentAt: null },
+        where: awaitingWhere,
         include: pickupInclude,
         orderBy: { createdAt: "desc" },
         take: PICKUP_DASHBOARD_LIMIT,
       }),
       prisma.pickup.findMany({
-        where: { ...readyWhere, readyEmailSentAt: { not: null } },
+        where: readyWhere,
         include: pickupInclude,
         orderBy: { createdAt: "desc" },
         take: PICKUP_DASHBOARD_LIMIT,
       }),
-      prisma.pickup.count({
-        where: { ...readyWhere, readyEmailSentAt: null },
-      }),
-      prisma.pickup.count({
-        where: { ...readyWhere, readyEmailSentAt: { not: null } },
-      }),
+      prisma.pickup.count({ where: awaitingWhere }),
+      prisma.pickup.count({ where: readyWhere }),
     ]);
 
   return {

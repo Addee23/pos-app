@@ -1,52 +1,43 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { notifyPickupReady } from "@/lib/pickup-notifications";
+import { markPickupAsPacked } from "@/lib/pickup-notifications";
 import { pickupResponseInclude } from "@/lib/pickup-serialize";
 import { prisma } from "@/lib/prisma";
-import { isAdmin } from "../../../../../../rbac";
 import { rateLimit } from "@/lib/rate-limit";
 
 type RouteParams = {
   params: Promise<{ id: string }>;
 };
 
-export async function POST(request: Request, { params }: RouteParams) {
+export async function PATCH(_request: Request, { params }: RouteParams) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Ej inloggad" }, { status: 401 });
   }
 
-  if (!isAdmin(session.user.role)) {
+  if (!session.user.storeId) {
     return NextResponse.json(
-      { error: "Endast admin kan skicka bekräftelsemail" },
-      { status: 403 },
+      { error: "Användaren saknar butik" },
+      { status: 400 },
     );
   }
 
-  const emailLimit = rateLimit({
-    key: `pickup-email:${session.user.id}`,
-    limit: 20,
+  const packLimit = rateLimit({
+    key: `pickup-pack:${session.user.id}`,
+    limit: 30,
     windowMs: 60 * 1000,
   });
 
-  if (!emailLimit.allowed) {
-    return tooManyRequests(emailLimit.retryAfterSeconds);
+  if (!packLimit.allowed) {
+    return tooManyRequests(packLimit.retryAfterSeconds);
   }
 
   const { id } = await params;
-  let force = false;
-
-  try {
-    const body = (await request.json()) as { force?: boolean };
-    force = body.force === true;
-  } catch {
-    force = false;
-  }
 
   const pickup = await prisma.pickup.findFirst({
     where: {
       id,
-      ...(session.user.storeId ? { storeId: session.user.storeId } : {}),
+      storeId: session.user.storeId,
     },
     select: { id: true },
   });
@@ -58,14 +49,14 @@ export async function POST(request: Request, { params }: RouteParams) {
     );
   }
 
-  const result = await notifyPickupReady(pickup.id, { force });
+  const result = await markPickupAsPacked(pickup.id, session.user.id);
 
   if (result.status === "error") {
     return NextResponse.json({ error: result.message }, { status: 400 });
   }
 
   if (result.status === "skipped") {
-    return NextResponse.json({ message: result.reason }, { status: 409 });
+    return NextResponse.json({ error: result.reason }, { status: 409 });
   }
 
   const updatedPickup = await prisma.pickup.findUnique({
@@ -74,9 +65,11 @@ export async function POST(request: Request, { params }: RouteParams) {
   });
 
   return NextResponse.json({
-    message: "Bekräftelsemail skickat",
+    message: result.readyEmailSentAt
+      ? "Ordern är packad och kunden har fått mail"
+      : "Ordern är packad (kundmail saknas)",
     pickup: updatedPickup,
-    readyEmailSentAt: result.readyEmailSentAt.toISOString(),
+    readyEmailSentAt: result.readyEmailSentAt?.toISOString() ?? null,
   });
 }
 

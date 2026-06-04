@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { PickupClient } from "@/components/pickups/PickupClient";
 import { loadPickupDashboard } from "@/lib/pickup-dashboard-data";
-import { processPendingPickupEmails } from "@/lib/pickup-notifications";
 
 export default async function UpphämtningPage() {
   const session = await auth();
@@ -16,14 +15,6 @@ export default async function UpphämtningPage() {
         Användaren saknar butik och kan därför inte se upphämtningar.
       </p>
     );
-  }
-
-  try {
-    void processPendingPickupEmails(session.user.storeId).catch((error) => {
-      console.error("Kunde inte skicka väntande upphämtningsmail:", error);
-    });
-  } catch (error) {
-    console.error("Kunde inte starta bakgrundssändning av upphämtningsmail:", error);
   }
 
   const initialDashboard = await loadPickupDashboard(session.user.storeId);

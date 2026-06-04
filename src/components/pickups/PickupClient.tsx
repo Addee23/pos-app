@@ -13,7 +13,7 @@ import type { SerializedPickup } from "@/lib/pickup-serialize";
 
 type UserRole = "ADMIN" | "PERSONAL";
 
-type PickupStatus = "READY" | "PICKED_UP" | "CANCELLED";
+type PickupStatus = "AWAITING_PACK" | "READY" | "PICKED_UP" | "CANCELLED";
 
 type PickupItem = {
   id: string;
@@ -146,6 +146,42 @@ export function PickupClient({
     }
   }
 
+  async function packPickup(pickupId: string) {
+    setActivePickupId(pickupId);
+
+    try {
+      const response = await fetch(`/api/pickups/${pickupId}/pack`, {
+        method: "PATCH",
+      });
+      const data = (await response.json()) as
+        | { pickup?: Pickup; message?: string; error?: string }
+        | { error?: string };
+
+      if (!response.ok) {
+        toast.error(
+          "error" in data && data.error
+            ? data.error
+            : "Kunde inte markera ordern som packad",
+        );
+        return;
+      }
+
+      if (!("pickup" in data) || !data.pickup) {
+        toast.error("Kunde inte läsa den packade ordern.");
+        return;
+      }
+
+      await applyPickupUpdate(data.pickup);
+      toast.success(
+        data.message ?? "Ordern är packad och kunden har fått bekräftelse",
+      );
+    } catch {
+      toast.error("Något gick fel när ordern skulle packas");
+    } finally {
+      setActivePickupId(null);
+    }
+  }
+
   async function completePickup(pickupId: string) {
     setActivePickupId(pickupId);
 
@@ -239,7 +275,8 @@ export function PickupClient({
           Upphämtningar
         </h2>
         <p className="mt-2 text-sm leading-6 text-zinc-500">
-          Flikarna uppdateras varje minut. Sök nedan på kod, kund eller produkt.
+          Packa order under &quot;Ska packas&quot;, skicka bekräftelse till kunden,
+          och markera som hämtad när kunden kommer. Listan uppdateras varje minut.
         </p>
 
         <PickupDashboardTabs
@@ -299,12 +336,13 @@ export function PickupClient({
         pickups={tabPickups}
         emptyLabel={
           activeTab === "needsHandling"
-            ? "Inga order behöver hanteras just nu."
+            ? "Inga order väntar på packning just nu."
             : "Inga order redo att hämtas just nu."
         }
         activePickupId={activePickupId}
         currentRole={currentRole}
         onCancel={cancelPickup}
+        onPack={packPickup}
         onComplete={completePickup}
         onOpenPopup={(pickupId) => {
           setSelectedPickupId(pickupId);
@@ -322,6 +360,7 @@ export function PickupClient({
             setPopupOpen(false);
             setSelectedPickupId(null);
           }}
+          onPack={packPickup}
           onComplete={completePickup}
         />
       ) : null}
@@ -432,6 +471,7 @@ function PickupList({
   activePickupId,
   currentRole,
   onCancel,
+  onPack,
   onComplete,
   onOpenPopup,
 }: {
@@ -440,6 +480,7 @@ function PickupList({
   activePickupId: string | null;
   currentRole: UserRole;
   onCancel: (pickupId: string) => void;
+  onPack: (pickupId: string) => void;
   onComplete: (pickupId: string) => void;
   onOpenPopup: (pickupId: string) => void;
 }) {
@@ -460,6 +501,7 @@ function PickupList({
           isSaving={activePickupId === pickup.id}
           currentRole={currentRole}
           onCancel={onCancel}
+          onPack={onPack}
           onComplete={onComplete}
           onOpenPopup={onOpenPopup}
         />
@@ -474,6 +516,7 @@ function PickupPopup({
   currentRole,
   onCancel,
   onClose,
+  onPack,
   onComplete,
 }: {
   pickups: Pickup[];
@@ -481,6 +524,7 @@ function PickupPopup({
   currentRole: UserRole;
   onCancel: (pickupId: string) => void;
   onClose: () => void;
+  onPack: (pickupId: string) => void;
   onComplete: (pickupId: string) => void;
 }) {
   return (
@@ -513,6 +557,7 @@ function PickupPopup({
               isSaving={activePickupId === pickup.id}
               currentRole={currentRole}
               onCancel={onCancel}
+              onPack={onPack}
               onComplete={onComplete}
             />
           ))}
@@ -527,6 +572,7 @@ function PickupCard({
   isSaving,
   currentRole,
   onCancel,
+  onPack,
   onComplete,
   onOpenPopup,
 }: {
@@ -534,11 +580,15 @@ function PickupCard({
   isSaving: boolean;
   currentRole: UserRole;
   onCancel: (pickupId: string) => void;
+  onPack: (pickupId: string) => void;
   onComplete: (pickupId: string) => void;
   onOpenPopup: (pickupId: string) => void;
 }) {
+  const canPack = pickup.status === "AWAITING_PACK";
   const canComplete = pickup.status === "READY";
-  const canCancel = currentRole === "ADMIN" && pickup.status === "READY";
+  const canCancel =
+    currentRole === "ADMIN" &&
+    (pickup.status === "AWAITING_PACK" || pickup.status === "READY");
 
   return (
     <article className="rounded-lg border border-zinc-200 bg-white p-4">
@@ -576,18 +626,29 @@ function PickupCard({
         >
           Visa
         </button>
-        <button
-          type="button"
-          disabled={!canComplete || isSaving}
-          onClick={() => onComplete(pickup.id)}
-          className="min-h-10 cursor-pointer rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:shadow-none"
-        >
-          {pickup.status === "PICKED_UP"
-            ? "Hämtad"
-            : isSaving
-              ? "Sparar..."
-              : "Markera hämtad"}
-        </button>
+        {canPack ? (
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={() => onPack(pickup.id)}
+            className="min-h-10 cursor-pointer rounded-lg bg-orange-500 px-3 text-sm font-semibold text-white shadow-sm shadow-orange-200 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:shadow-none"
+          >
+            {isSaving ? "Packar..." : "Markera packad"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={!canComplete || isSaving}
+            onClick={() => onComplete(pickup.id)}
+            className="min-h-10 cursor-pointer rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:shadow-none"
+          >
+            {pickup.status === "PICKED_UP"
+              ? "Hämtad"
+              : isSaving
+                ? "Sparar..."
+                : "Markera hämtad"}
+          </button>
+        )}
       </div>
 
       {canCancel ? (
@@ -616,16 +677,21 @@ function PickupInfoCard({
   isSaving,
   currentRole,
   onCancel,
+  onPack,
   onComplete,
 }: {
   pickup: Pickup;
   isSaving: boolean;
   currentRole: UserRole;
   onCancel: (pickupId: string) => void;
+  onPack: (pickupId: string) => void;
   onComplete: (pickupId: string) => void;
 }) {
+  const canPack = pickup.status === "AWAITING_PACK";
   const canComplete = pickup.status === "READY";
-  const canCancel = currentRole === "ADMIN" && pickup.status === "READY";
+  const canCancel =
+    currentRole === "ADMIN" &&
+    (pickup.status === "AWAITING_PACK" || pickup.status === "READY");
 
   return (
     <article className="rounded-[1.75rem] border border-[#dfd4c6] bg-[#f8f4ed] p-4 shadow-sm">
@@ -663,21 +729,38 @@ function PickupInfoCard({
         <ProductFact label="Kundmail" value={pickup.customerEmail ?? "Saknas"} />
         <ProductFact label="Mailstatus" value={mailStatusLabel(pickup)} />
         <ProductFact label="Skapad" value={formatDate(pickup.createdAt)} />
+        {pickup.packedAt ? (
+          <ProductFact
+            label="Packad"
+            value={`${formatDate(pickup.packedAt)} av ${pickup.packedBy?.name ?? "okänd"}`}
+          />
+        ) : null}
         <ProductFact label={historyLabel(pickup)} value={historyValue(pickup)} />
       </div>
 
-      <button
-        type="button"
-        disabled={!canComplete || isSaving}
-        onClick={() => onComplete(pickup.id)}
-        className="mt-4 min-h-12 w-full cursor-pointer rounded-xl bg-orange-500 px-4 text-sm font-bold text-white shadow-sm shadow-orange-200 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {pickup.status === "PICKED_UP"
-          ? "Redan hämtad"
-          : isSaving
-            ? "Sparar..."
-            : "Markera hämtad"}
-      </button>
+      {canPack ? (
+        <button
+          type="button"
+          disabled={isSaving}
+          onClick={() => onPack(pickup.id)}
+          className="mt-4 min-h-12 w-full cursor-pointer rounded-xl bg-orange-500 px-4 text-sm font-bold text-white shadow-sm shadow-orange-200 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isSaving ? "Packar..." : "Markera som packad och skicka mail"}
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled={!canComplete || isSaving}
+          onClick={() => onComplete(pickup.id)}
+          className="mt-4 min-h-12 w-full cursor-pointer rounded-xl bg-orange-500 px-4 text-sm font-bold text-white shadow-sm shadow-orange-200 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pickup.status === "PICKED_UP"
+            ? "Redan hämtad"
+            : isSaving
+              ? "Sparar..."
+              : "Markera hämtad"}
+        </button>
+      )}
 
       {canCancel ? (
         <button
@@ -762,17 +845,20 @@ function SummaryBox({ label, value }: { label: string; value: string }) {
 
 function StatusBadge({ status }: { status: PickupStatus }) {
   const labels: Record<PickupStatus, string> = {
+    AWAITING_PACK: "Ska packas",
     READY: "Redo",
     PICKED_UP: "Hämtad",
     CANCELLED: "Avbruten",
   };
 
   const className =
-    status === "READY"
-      ? "bg-emerald-50 text-emerald-700"
-      : status === "PICKED_UP"
-        ? "bg-zinc-100 text-zinc-600"
-        : "bg-red-50 text-red-700";
+    status === "AWAITING_PACK"
+      ? "bg-orange-50 text-orange-700"
+      : status === "READY"
+        ? "bg-emerald-50 text-emerald-700"
+        : status === "PICKED_UP"
+          ? "bg-zinc-100 text-zinc-600"
+          : "bg-red-50 text-red-700";
 
   return (
     <span className={`rounded-full px-2 py-1 text-xs font-semibold ${className}`}>
@@ -802,15 +888,21 @@ function ProductFact({ label, value }: { label: string; value: string }) {
 }
 
 function mailStatusLabel(pickup: Pickup): string {
+  if (pickup.status === "AWAITING_PACK") {
+    return pickup.customerEmail
+      ? "Skickas när ordern markeras som packad"
+      : "Kundmail saknas – meddela kunden manuellt";
+  }
+
   if (pickup.readyEmailSentAt) {
     return `Skickat ${formatDate(pickup.readyEmailSentAt)}`;
   }
 
   if (!pickup.customerEmail) {
-    return "Kundmail saknas – hantera manuellt";
+    return "Kundmail saknas – meddela kunden manuellt";
   }
 
-  return "Väntar på bekräftelsemail";
+  return "Mejl kunde inte skickas vid packning";
 }
 
 function historyLabel(pickup: Pickup): string {

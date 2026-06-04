@@ -13,6 +13,7 @@ import {
   startOfDay,
   sumSaleTotals,
 } from "@/lib/dashboard-sales-chart";
+import { PickupStatus } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export default function AdminDashboardPage() {
@@ -53,7 +54,11 @@ async function DashboardContent() {
   ] = await Promise.all([
     prisma.product.count(),
     prisma.product.count({ where: { stockQuantity: { lte: 5 } } }),
-    prisma.pickup.count({ where: { status: "READY" } }),
+    prisma.pickup.count({
+      where: {
+        status: { in: [PickupStatus.AWAITING_PACK, PickupStatus.READY] },
+      },
+    }),
     prisma.sale.findMany({
       where: { createdAt: { gte: today } },
       select: { total: true },
