@@ -92,6 +92,13 @@ export function AsyncPendingProvider({ children }: { children: ReactNode }) {
       {isActive ? (
         <div
           aria-hidden
+          className="fixed inset-0 z-[105] cursor-wait bg-zinc-950/10 backdrop-blur-[1px]"
+        />
+      ) : null}
+
+      {isActive ? (
+        <div
+          aria-hidden
           className="pointer-events-none fixed inset-x-0 top-0 z-[110] h-[3px] overflow-hidden bg-blue-100/70"
         >
           <div className="h-full w-2/5 animate-[nav-progress_0.75s_ease-in-out_infinite] rounded-full bg-gradient-to-r from-blue-600 via-sky-400 to-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.45)]" />

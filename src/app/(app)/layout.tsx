@@ -42,7 +42,7 @@ export default async function AppLayout({
             role={session.user.role}
           />
           <main className="app-main relative w-full flex-1 px-4 pb-28 pt-4 lg:px-8 lg:pb-8 lg:pt-6">
-            <div className="mx-auto w-full max-w-6xl">{children}</div>
+            <div className="w-full">{children}</div>
           </main>
           <BottomNav role={session.user.role} />
         </div>
