@@ -16,6 +16,24 @@ const optionalUrl = z
     { message: "Måste vara en giltig URL" },
   );
 
+/** Publik bild-URL eller lokal sökväg under /public (t.ex. /min-butik.png). */
+const optionalLogoUrl = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => (value === "" ? null : value ?? null))
+  .refine(
+    (value) => {
+      if (value === null) return true;
+      if (value.startsWith("/")) return true;
+      return z.string().url().safeParse(value).success;
+    },
+    {
+      message:
+        "Måste vara en giltig URL (https://…) eller lokal sökväg (t.ex. /min-butik.png)",
+    },
+  );
+
 const optionalSecret = z
   .string()
   .trim()
@@ -24,7 +42,7 @@ const optionalSecret = z
 
 export const storeSettingsSchema = z.object({
   name: z.string().trim().min(1, "Butiksnamn krävs"),
-  logoUrl: optionalUrl,
+  logoUrl: optionalLogoUrl,
   wooUrl: optionalUrl,
   wooConsumerKey: optionalSecret,
   wooConsumerSecret: optionalSecret,

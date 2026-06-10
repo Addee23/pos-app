@@ -121,3 +121,48 @@ textarea {
 .toast-enter {
   animation: toast-enter 0.22s ease-out;
 }
+
+.receipt-paper {
+  width: min(100%, calc(var(--receipt-width-mm, 80) * 1mm));
+  max-width: calc(var(--receipt-width-mm, 80) * 1mm);
+}
+
+@media print {
+  @page {
+    margin: 4mm;
+  }
+
+  body {
+    background: #ffffff !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #receipt-print-area,
+  #receipt-print-area * {
+    visibility: visible;
+  }
+
+  #receipt-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: calc(var(--receipt-width-mm, 80) * 1mm);
+    max-width: calc(var(--receipt-width-mm, 80) * 1mm);
+    color: #000000 !important;
+    background: #ffffff !important;
+  }
+
+  #receipt-print-area img {
+    display: block !important;
+    max-height: 16mm;
+    max-width: 70%;
+    margin-left: auto;
+    margin-right: auto;
+    object-fit: contain;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

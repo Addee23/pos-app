@@ -435,7 +435,7 @@ export function StoreSettingsForm({
                 name="logoUrl"
                 defaultValue={store.logoUrl ?? ""}
                 placeholder="https://din-butik.se/logo.png"
-                hint="Publik bild-URL (PNG/JPG). Loggan visas högst upp i upphämtningsmailet."
+                hint="Butikens egen logotyp (PNG/JPG) eller lokal fil i public/. Tomt = neutral butiksikon på kvitto tills logga lagts in."
               />
               <Textarea
                 label="Butiksadress (för karta i mail)"

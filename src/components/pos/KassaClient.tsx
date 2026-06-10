@@ -1,11 +1,16 @@
 "use client";
 
 import { useToast } from "@/components/ui/ToastProvider";
-import { useState } from "react";
+import {
+  ReceiptStoreLogo,
+  resolveReceiptLogoUrl,
+} from "@/components/pos/ReceiptStoreLogo";
+import { useState, type CSSProperties } from "react";
 
 export type PosStore = {
   id: string;
   name: string;
+  logoUrl: string | null;
   address: string | null;
   receiptFooter: string | null;
   returnText: string | null;
@@ -693,9 +698,12 @@ function ReceiptPanel({
   receipt: Receipt;
   store: PosStore;
 }) {
+  const receiptWidthMm = store.receiptWidthMm > 0 ? store.receiptWidthMm : 80;
+  const logoUrl = resolveReceiptLogoUrl(store.logoUrl);
+
   return (
-    <section className="rounded-3xl border border-zinc-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
+    <section className="rounded-3xl border border-zinc-200 bg-white p-4 print:border-0 print:bg-white print:p-0">
+      <div className="flex items-start justify-between gap-3 print:hidden">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
             Kvitto
@@ -713,8 +721,17 @@ function ReceiptPanel({
         </button>
       </div>
 
-      <div className="mt-4 rounded-2xl bg-zinc-50 p-4 text-sm text-zinc-900">
+      <div
+        id="receipt-print-area"
+        className="receipt-paper mx-auto mt-4 rounded-2xl bg-zinc-50 p-4 text-sm text-zinc-900 print:mt-0 print:rounded-none print:bg-white print:p-0 print:text-black"
+        style={
+          {
+            "--receipt-width-mm": String(receiptWidthMm),
+          } as CSSProperties
+        }
+      >
         <div className="text-center">
+          <ReceiptStoreLogo logoUrl={logoUrl} storeName={store.name} />
           <p className="font-semibold">{store.name}</p>
           {store.address ? (
             <p className="mt-1 whitespace-pre-line text-xs text-zinc-500">
@@ -768,7 +785,7 @@ function ReceiptPanel({
           </p>
         ) : null}
         {store.socialLinks ? (
-          <p className="mt-2 whitespace-pre-line text-center text-xs text-zinc-500">
+          <p className="mt-2 whitespace-pre-line text-center text-xs text-zinc-500 print:text-black">
             {store.socialLinks}
           </p>
         ) : null}

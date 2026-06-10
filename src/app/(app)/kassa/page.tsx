@@ -29,6 +29,7 @@ export default async function KassaPage() {
     select: {
       id: true,
       name: true,
+      logoUrl: true,
       address: true,
       receiptFooter: true,
       returnText: true,
@@ -52,6 +53,7 @@ export default async function KassaPage() {
   const serializedStore: PosStore = {
     id: store.id,
     name: store.name,
+    logoUrl: store.logoUrl,
     address: store.address,
     receiptFooter: store.receiptFooter,
     returnText: store.returnText,

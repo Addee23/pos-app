@@ -31,23 +31,23 @@ async function main() {
   const { DEFAULT_TEST_PICKUP_ADDRESS: exampleAddress } = await import(
     "../src/lib/constants/pickup"
   );
-  const exampleLogo =
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Generic_store_icon.svg/240px-Generic_store_icon.svg.png";
-
   const store = await prisma.store.upsert({
     where: { slug: "demo-butik" },
     update: {
       address: exampleAddress,
-      logoUrl: exampleLogo,
       thankYouMessage: "Tack för ditt köp – vi ses vid upphämtningsdisken!",
     },
     create: {
       name: "Demo Butik",
       slug: "demo-butik",
       address: exampleAddress,
-      logoUrl: exampleLogo,
       thankYouMessage: "Tack för ditt köp – vi ses vid upphämtningsdisken!",
     },
+  });
+
+  await prisma.store.updateMany({
+    where: { logoUrl: "/woo-logo.svg" },
+    data: { logoUrl: null },
   });
 
   const adminPassword = await hash("admin123", 12);
