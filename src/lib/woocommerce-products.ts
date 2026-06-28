@@ -74,9 +74,13 @@ export async function normalizeWooProducts({
     const brand =
       extractWooBrand(product) ??
       inferProductTaxonomy({ name, shortDescription }).brand;
-    const country =
-      extractWooCountry(product) ??
-      inferProductTaxonomy({ name, shortDescription, brand }).country;
+
+    // Produkter med flera kategorier är tillbehör — de ska inte ha ursprungsland.
+    const isAccessory = asArray(product.categories).length > 1;
+    const country = isAccessory
+      ? null
+      : extractWooCountry(product) ??
+        inferProductTaxonomy({ name, shortDescription, brand }).country;
 
     normalized.push({
       wooProductId,
@@ -93,7 +97,10 @@ export async function normalizeWooProducts({
       category,
       brand,
       country,
-      wooMetadata: extractWooProductMetadata(product),
+      wooMetadata: {
+        ...(brand ? { brand } : {}),
+        ...extractWooProductMetadata(product),
+      },
       variants: variationDetails.map((variant, index) =>
         normalizeVariant(variant, product, index),
       ),

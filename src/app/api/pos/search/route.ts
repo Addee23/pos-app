@@ -39,11 +39,25 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Ej inloggad" }, { status: 401 });
   }
 
-  if (!session.user.storeId) {
-    return NextResponse.json(
-      { error: "Användaren saknar butik" },
-      { status: 400 },
-    );
+  const isAdmin = session.user.role === "ADMIN";
+  let userStoreId: string;
+
+  if (isAdmin) {
+    const { searchParams: sp } = new URL(request.url);
+    const paramStoreId = sp.get("storeId");
+    if (!paramStoreId) {
+      return NextResponse.json({ error: "Ange storeId" }, { status: 400 });
+    }
+    userStoreId = paramStoreId;
+  } else {
+    const freshUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { storeId: true },
+    });
+    if (!freshUser?.storeId) {
+      return NextResponse.json({ error: "Användaren saknar butik" }, { status: 400 });
+    }
+    userStoreId = freshUser.storeId;
   }
 
   const searchLimit = rateLimit({
@@ -77,7 +91,7 @@ export async function GET(request: Request) {
 
   const products = await prisma.product.findMany({
     where: {
-      storeId: session.user.storeId,
+      storeId: userStoreId,
       ...(search.mode === "number"
         ? {
             OR: [
@@ -160,6 +174,13 @@ export async function GET(request: Request) {
   });
 
   const exactMatch = findExactMatch(results, search);
+
+  // Visa produkter med lager i lager först.
+  results.sort((a, b) => {
+    const aInStock = a.stockQuantity > 0 ? 0 : 1;
+    const bInStock = b.stockQuantity > 0 ? 0 : 1;
+    return aInStock - bInStock;
+  });
 
   return NextResponse.json({
     mode: search.mode,

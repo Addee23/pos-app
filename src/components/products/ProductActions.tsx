@@ -52,25 +52,23 @@ export function ProductActions({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-2">
-        {showEditLink ? (
-          <Link
-            href={`/admin/products/${productId}`}
-            className="inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-4 text-sm font-bold text-blue-800 transition hover:border-blue-300 hover:bg-blue-100 sm:flex-none sm:min-w-[7.5rem]"
-          >
-            Redigera
-          </Link>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => void handleDelete()}
-          disabled={deleting}
-          className="inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-bold text-red-800 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:min-w-[7.5rem]"
+    <div className="flex gap-2">
+      {showEditLink ? (
+        <Link
+          href={`/admin/products/${productId}`}
+          className="inline-flex min-h-9 flex-1 cursor-pointer items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-800 transition hover:border-blue-300 hover:bg-blue-100"
         >
-          {deleting ? "Tar bort..." : "Ta bort"}
-        </button>
-      </div>
+          Redigera
+        </Link>
+      ) : null}
+      <button
+        type="button"
+        onClick={() => void handleDelete()}
+        disabled={deleting}
+        className="inline-flex min-h-9 flex-1 cursor-pointer items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 text-xs font-bold text-red-800 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {deleting ? "Tar bort..." : "Ta bort"}
+      </button>
     </div>
   );
 }

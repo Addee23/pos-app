@@ -105,9 +105,10 @@ export async function markPickupAsPacked(
     }
 
     console.error("markPickupAsPacked failed", error);
+    const detail = error instanceof Error ? error.message : String(error);
     return {
       status: "error",
-      message: "Kunde inte markera ordern som packad",
+      message: `Kunde inte markera ordern som packad: ${detail}`,
     };
   }
 }
@@ -166,9 +167,10 @@ export async function notifyPickupReady(
     }
 
     console.error("notifyPickupReady failed", error);
+    const detail = error instanceof Error ? error.message : String(error);
     return {
       status: "error",
-      message: "Kunde inte skicka bekräftelsemail",
+      message: `Kunde inte skicka bekräftelsemail: ${detail}`,
     };
   }
 }

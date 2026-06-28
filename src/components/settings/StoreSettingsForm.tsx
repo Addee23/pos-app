@@ -8,7 +8,7 @@ import type { WooWebhookMode } from "@/lib/woo-webhook-config";
 import { formatWooJsonForEditor } from "@/lib/product-woo-json";
 import { normalizeSecretFormValue } from "@/lib/secret-crypto";
 import { WooLogo } from "@/components/branding/WooLogo";
-import { WooMetaBatchPanel } from "@/components/products/WooMetaBatchPanel";
+import { MetaLabelsEditor } from "@/components/settings/MetaLabelsEditor";
 import { useToast } from "@/components/ui/ToastProvider";
 
 type SettingsSectionId = "butik" | "woocommerce" | "epost" | "kvitto";
@@ -197,7 +197,7 @@ export function StoreSettingsForm({
     const params = new URLSearchParams();
     params.set("storeId", storeId);
     params.set("section", activeSection);
-    router.push(`/admin/settings?${params.toString()}`);
+    window.location.href = `/admin/settings?${params.toString()}`;
   }
 
   function selectSection(sectionId: SettingsSectionId) {
@@ -419,30 +419,24 @@ export function StoreSettingsForm({
           </section>
 
           <div className={activeSection === "butik" ? "flex flex-col gap-4" : "hidden"}>
-            <SettingsCard
-              title="Butik & upphämtningsmail"
-              description="Logo och adress visas i mailet när ordern är redo. Adressen används för Google Maps-kartan."
-            >
+            <SettingsCard title="Butik & upphämtningsmail">
               <Field
                 label="Butiksnamn"
                 name="name"
                 defaultValue={store.name}
                 placeholder="t.ex. Demo Butik"
-                hint="Visas i appen, på kvitton och i upphämtningsmail."
               />
               <Field
-                label="Logo URL (direkt länk till bild)"
+                label="Logo URL"
                 name="logoUrl"
                 defaultValue={store.logoUrl ?? ""}
                 placeholder="https://din-butik.se/logo.png"
-                hint="Butikens egen logotyp (PNG/JPG) eller lokal fil i public/. Tomt = neutral butiksikon på kvitto tills logga lagts in."
               />
               <Textarea
-                label="Butiksadress (för karta i mail)"
+                label="Butiksadress"
                 name="address"
                 defaultValue={store.address ?? ""}
                 placeholder="Storgatan 1, 123 45 Stockholm"
-                hint="Skapar en klickbar Google Maps-karta i bekräftelsemailet till kunden."
               />
             </SettingsCard>
           </div>
@@ -474,10 +468,7 @@ export function StoreSettingsForm({
           </div>
 
           <div className={activeSection === "kvitto" ? "flex flex-col gap-4" : "hidden"}>
-            <SettingsCard
-              title="Kvitto"
-              description="Texter och format som används när kvittot skrivs ut."
-            >
+            <SettingsCard title="Kvitto">
               <Field
                 label="Kvittobredd (mm)"
                 name="receiptWidthMm"
@@ -486,43 +477,35 @@ export function StoreSettingsForm({
                 max="112"
                 defaultValue={store.receiptWidthMm}
                 placeholder="80"
-                hint="Vanligt 58 eller 80 mm för termoskrivare."
               />
               <Textarea
                 label="Tackmeddelande"
                 name="thankYouMessage"
                 defaultValue={store.thankYouMessage ?? ""}
                 placeholder="Tack för ditt köp!"
-                hint="Visas högst upp på kvittot efter köpet."
               />
               <Textarea
                 label="Footer-text"
                 name="receiptFooter"
                 defaultValue={store.receiptFooter ?? ""}
                 placeholder="Öppet mån–fre 10–18"
-                hint="Extra information längst ner på kvittot."
               />
               <Textarea
                 label="Returtext"
                 name="returnText"
                 defaultValue={store.returnText ?? ""}
                 placeholder="14 dagars öppet köp med kvitto"
-                hint="Retur- och bytespolicy som skrivs ut på kvittot."
               />
               <Textarea
                 label="Sociala medier"
                 name="socialLinks"
                 defaultValue={store.socialLinks ?? ""}
                 placeholder="Instagram: @butik · Facebook: /butik"
-                hint="Valfria länkar eller handtag som visas på kvittot."
               />
             </SettingsCard>
           </div>
 
           <div className="sticky bottom-20 z-20 rounded-2xl border border-zinc-200/80 bg-white/95 p-3 shadow-lg backdrop-blur lg:bottom-4">
-            <p className="mb-2 text-center text-[11px] font-semibold text-zinc-500 lg:text-left">
-              Sparar alla fält oavsett vilken flik du står på.
-            </p>
             <button
               type="submit"
               disabled={saving}
@@ -575,7 +558,7 @@ function SettingsSectionNav({
                       : "border-transparent bg-zinc-50/80 hover:border-zinc-200 hover:bg-white lg:bg-transparent"
                   }`}
                 >
-                  <span className="flex min-h-[5.5rem] w-full flex-col items-center gap-2 p-3 text-center lg:min-h-0 lg:flex-row lg:justify-center lg:gap-2.5 lg:px-3 lg:py-3">
+                  <span className="flex min-h-22 w-full flex-col items-center gap-2 p-3 text-center lg:min-h-0 lg:flex-row lg:justify-center lg:gap-2.5 lg:px-3 lg:py-3">
                     <span
                       className={`flex size-10 shrink-0 items-center justify-center rounded-2xl transition lg:size-9 ${
                         active ? style.iconActive : style.icon
@@ -634,7 +617,7 @@ function SettingsSectionIcon({
         </svg>
       );
     case "woocommerce":
-      return <WooLogo inverted={active} className="h-[11px] w-auto" />;
+      return <WooLogo inverted={active} className="h-2.75 w-auto" />;
     case "epost":
       return (
         <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden>
@@ -701,7 +684,9 @@ function IntegrationCard({
   const isTestMode = webhookMode === "test";
   const [fetchedJson, setFetchedJson] = useState("");
   const [fetchingJson, setFetchingJson] = useState(false);
+  const [fetchingDbJson, setFetchingDbJson] = useState(false);
   const [jsonCopied, setJsonCopied] = useState(false);
+  const [jsonExpanded, setJsonExpanded] = useState(false);
 
   async function handleFetchLatestJson() {
     setFetchingJson(true);
@@ -729,6 +714,25 @@ function IntegrationCard({
     }
   }
 
+  async function handleFetchDbJson() {
+    setFetchingDbJson(true);
+    setJsonCopied(false);
+    try {
+      const response = await fetch(`/api/stores/${store.id}/products/db-json`);
+      const data = (await response.json()) as { error?: string; jsonText?: string; count?: number };
+      if (!response.ok) {
+        toast.error(data.error ?? "Kunde inte hämta JSON från databasen");
+        return;
+      }
+      setFetchedJson(data.jsonText ?? "");
+      toast.success(`Hämtade ${data.count ?? 0} produkter från databasen.`);
+    } catch {
+      toast.error("Något gick fel. Försök igen.");
+    } finally {
+      setFetchingDbJson(false);
+    }
+  }
+
   async function handleCopyJson() {
     if (!fetchedJson) {
       return;
@@ -748,7 +752,7 @@ function IntegrationCard({
       <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
         <div className="flex items-start gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[#EDE5FF]">
-            <WooLogo className="h-[13px] w-auto" />
+            <WooLogo className="h-3.25 w-auto" />
           </div>
           <div>
             <h3 className="text-sm font-bold text-zinc-950">WooCommerce</h3>
@@ -769,31 +773,6 @@ function IntegrationCard({
       </div>
 
       <div className="p-4">
-        {isTestMode ? (
-          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
-            <p className="font-bold">Testläge (WOOCOMMERCE_WEBHOOK_MODE=test)</p>
-            <p className="mt-1">
-              Simulera ordrar med{" "}
-              <code className="rounded bg-white px-1">npm run simulate:woo-order</code>.
-              Byt till{" "}
-              <code className="rounded bg-white px-1">production</code> i .env när
-              riktig Woo-butik kopplas — samma webhook-URL, då krävs signatur och
-              fraktmetod &quot;hämta i butik&quot;.
-            </p>
-          </div>
-        ) : (
-          <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-950">
-            <p className="font-bold">Produktion</p>
-            <p className="mt-1">
-              Endast ordrar med upphämtningsfrakt (t.ex. local_pickup) skapar
-              upphämtning. Konfigurera webhook i Woo med URL och secret nedan.
-            </p>
-          </div>
-        )}
-        <p className="mb-3 text-xs text-zinc-500">
-          API-uppgifter: lämna tomt för att behålla sparade värden.
-        </p>
-
         <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
           <Field
             label="WooCommerce URL"
@@ -801,21 +780,18 @@ function IntegrationCard({
             type="url"
             defaultValue={store.wooUrl ?? ""}
             placeholder="https://dinbutik.se"
-            hint="Butikens WooCommerce-adress utan /wp-admin."
           />
           {wooSecretPreviews.consumerKey ? (
             <StoredSecretField
               label="Consumer Key"
               name="wooConsumerKey"
               savedMask={wooSecretPreviews.consumerKey}
-              hint="Klicka i fältet och skriv ny nyckel för att byta."
             />
           ) : (
             <Field
               label="Consumer Key"
               name="wooConsumerKey"
               placeholder="ck_..."
-              hint="Klistra in consumer key från WooCommerce."
             />
           )}
           {wooSecretPreviews.consumerSecret ? (
@@ -823,14 +799,12 @@ function IntegrationCard({
               label="Consumer Secret"
               name="wooConsumerSecret"
               savedMask={wooSecretPreviews.consumerSecret}
-              hint="Klicka i fältet och skriv ny hemlighet för att byta."
             />
           ) : (
             <Field
               label="Consumer Secret"
               name="wooConsumerSecret"
               placeholder="cs_..."
-              hint="Klistra in consumer secret från WooCommerce."
             />
           )}
           <div className="grid grid-cols-[1fr_auto] items-end gap-2">
@@ -841,7 +815,6 @@ function IntegrationCard({
                 savedMask={wooSecretPreviews.webhookSecret}
                 value={webhookSecret}
                 onChangeValue={onWebhookSecretChange}
-                hint="Samma secret används på båda webhooks i WooCommerce."
               />
             ) : (
               <Field
@@ -850,7 +823,6 @@ function IntegrationCard({
                 value={webhookSecret}
                 onChangeValue={onWebhookSecretChange}
                 placeholder="Generera eller klistra in"
-                hint="Samma secret används på båda webhooks i WooCommerce."
               />
             )}
             <button
@@ -865,7 +837,7 @@ function IntegrationCard({
 
         <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
           <p className="text-xs font-bold text-zinc-700">
-            Webhook-URL:er för denna butik
+            Webhook-URL:er
           </p>
           <div className="mt-3 flex flex-col gap-3">
             {webhookUrls.map((webhook) => (
@@ -890,51 +862,71 @@ function IntegrationCard({
               </div>
             ))}
           </div>
-          <p className="mt-3 text-xs leading-5 text-zinc-500">
-            Använd samma webhook secret på båda webhooks i WooCommerce.
-          </p>
         </div>
 
         <div className="mt-5 border-t border-zinc-100 pt-4">
-          <WooMetaBatchPanel
-            lockStoreId={store.id}
-            lockStoreName={store.name}
-            embedded
-          />
+          <p className="mb-3 text-xs font-semibold text-zinc-500">Visningsnamn för metadata</p>
+          <MetaLabelsEditor storeId={store.id} />
         </div>
 
         <div className="mt-4 border-t border-zinc-100 pt-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-medium text-zinc-600">
-              JSON · 10 senaste från Woo
-            </p>
-            <button
-              type="button"
-              onClick={() => void handleFetchLatestJson()}
-              disabled={fetchingJson}
-              className="h-9 cursor-pointer rounded-lg bg-zinc-900 px-3 text-xs font-semibold text-white transition hover:bg-zinc-800 disabled:bg-zinc-300"
+          <button
+            type="button"
+            onClick={() => setJsonExpanded((v) => !v)}
+            className="flex w-full items-center justify-between text-xs font-medium text-zinc-600 hover:text-zinc-900"
+          >
+            <span>Produkter · JSON</span>
+            <svg
+              className={`h-4 w-4 transition-transform ${jsonExpanded ? "rotate-180" : ""}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
             >
-              {fetchingJson ? "Hämtar…" : "Hämta JSON"}
-            </button>
-          </div>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
 
-          {fetchedJson ? (
-            <>
-              <textarea
-                readOnly
-                value={fetchedJson}
-                rows={6}
-                className="mt-2 w-full resize-y rounded-xl bg-zinc-100/60 px-3 py-2 font-mono text-xs leading-5 text-zinc-700 outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => void handleCopyJson()}
-                className="mt-2 h-8 cursor-pointer rounded-lg px-2 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
-              >
-                {jsonCopied ? "Kopierad" : "Kopiera"}
-              </button>
-            </>
-          ) : null}
+          {jsonExpanded && (
+            <div className="mt-3 flex flex-col gap-2">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleFetchDbJson()}
+                  disabled={fetchingDbJson}
+                  className="h-9 cursor-pointer rounded-lg bg-zinc-900 px-3 text-xs font-semibold text-white transition hover:bg-zinc-800 disabled:bg-zinc-300"
+                >
+                  {fetchingDbJson ? "Hämtar…" : "Hämta JSON"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleFetchLatestJson()}
+                  disabled={fetchingJson}
+                  className="h-9 cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-600 transition hover:bg-zinc-50 disabled:opacity-50"
+                >
+                  {fetchingJson ? "Hämtar…" : "Hämta från Woo"}
+                </button>
+              </div>
+
+              {fetchedJson ? (
+                <>
+                  <textarea
+                    readOnly
+                    value={fetchedJson}
+                    rows={6}
+                    className="w-full resize-y rounded-xl bg-zinc-100/60 px-3 py-2 font-mono text-xs leading-5 text-zinc-700 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleCopyJson()}
+                    className="self-start h-8 cursor-pointer rounded-lg px-2 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
+                  >
+                    {jsonCopied ? "Kopierad" : "Kopiera"}
+                  </button>
+                </>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
     </section>
@@ -957,12 +949,7 @@ function SmtpSettingsCard({
   return (
     <section className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
-        <div>
-          <h3 className="text-sm font-bold text-zinc-950">Mail / SMTP</h3>
-          <p className="mt-0.5 text-xs text-zinc-500">
-            Använd en testmail nu och byt till butikens riktiga mail senare.
-          </p>
-        </div>
+        <h3 className="text-sm font-bold text-zinc-950">Mail / SMTP</h3>
         <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
           SMTP
         </span>
@@ -975,7 +962,6 @@ function SmtpSettingsCard({
             name="smtpHost"
             defaultValue={store.smtpHost ?? ""}
             placeholder="smtp.gmail.com"
-            hint="Servern som skickar e-post, t.ex. smtp.gmail.com."
           />
           <Field
             label="SMTP port"
@@ -983,7 +969,6 @@ function SmtpSettingsCard({
             type="number"
             defaultValue={store.smtpPort ?? 587}
             placeholder="587"
-            hint="Vanligt 587 (TLS) eller 465 (SSL)."
           />
           <label className="mt-2 flex min-h-12 cursor-pointer items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-700">
             <input
@@ -998,21 +983,18 @@ function SmtpSettingsCard({
             label={`SMTP användare${store.smtpUser ? " · installerad" : ""}`}
             name="smtpUser"
             placeholder="din-mail@example.com"
-            hint="Lämna tomt för att behålla sparad användare."
           />
           <Field
             label={`SMTP lösenord${store.smtpPass ? " · installerad" : ""}`}
             name="smtpPass"
             type="password"
             placeholder="••••••••"
-            hint="Lämna tomt för att behålla sparat lösenord."
           />
           <Field
             label="Avsändare"
             name="smtpFrom"
             defaultValue={store.smtpFrom ?? ""}
             placeholder="POS Demo <din-mail@example.com>"
-            hint="Namn och e-post som mottagaren ser som avsändare."
           />
         </div>
 
@@ -1024,7 +1006,6 @@ function SmtpSettingsCard({
             value={testEmail}
             onChangeValue={onTestEmailChange}
             placeholder="din-mail@example.com"
-            hint="Kontrollera att SMTP-inställningarna fungerar innan du går live."
           />
           <button
             type="button"
@@ -1042,19 +1023,14 @@ function SmtpSettingsCard({
 
 function SettingsCard({
   title,
-  description,
   children,
 }: {
   title: string;
-  description: string;
   children: React.ReactNode;
 }) {
   return (
     <section className="flex flex-col gap-3 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm">
-      <div>
-        <h3 className="text-sm font-bold text-zinc-900">{title}</h3>
-        <p className="mt-1 text-xs leading-5 text-zinc-500">{description}</p>
-      </div>
+      <h3 className="text-sm font-bold text-zinc-900">{title}</h3>
       {children}
     </section>
   );

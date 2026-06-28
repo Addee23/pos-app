@@ -72,9 +72,10 @@ type SaleResponse = {
 type KassaClientProps = {
   store: PosStore;
   isAdmin?: boolean;
+  allStores?: { id: string; name: string }[];
 };
 
-export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
+export function KassaClient({ store, isAdmin = false, allStores }: KassaClientProps) {
   const toast = useToast();
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -104,7 +105,7 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
 
     try {
       const response = await fetch(
-        `/api/pos/search?q=${encodeURIComponent(nextQuery)}`,
+        `/api/pos/search?q=${encodeURIComponent(nextQuery)}&storeId=${encodeURIComponent(store.id)}`,
       );
 
       if (!response.ok) {
@@ -222,6 +223,17 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
     );
   }
 
+  function setExactQuantity(cartKey: string, value: number) {
+    setCart((currentCart) =>
+      currentCart.flatMap((item) => {
+        if (item.cartKey !== cartKey) return [item];
+        if (value <= 0) return [];
+        const clamped = Math.min(value, item.maxQuantity);
+        return [{ ...item, quantity: clamped }];
+      }),
+    );
+  }
+
   async function completeSale() {
     if (cart.length === 0) {
       toast.error("Lägg till minst en vara innan du slutför köpet.");
@@ -235,6 +247,7 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          storeId: store.id,
           items: cart.map((item) => ({
             productId: item.productId,
             variantId: item.variantId,
@@ -273,20 +286,29 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
     <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:items-start lg:gap-6">
       <section className="flex flex-col gap-4">
         <div className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-            POS
-          </p>
-          <h2 className="mt-1 text-xl font-semibold text-zinc-900">Kassa</h2>
-          <p className="mt-1 text-xs font-bold text-blue-700">{store.name}</p>
-          <p className="mt-2 text-sm leading-6 text-zinc-500">
-            Exakt EAN eller nummer läggs direkt i varukorgen. Namn eller
-            WooCommerce-länk söker fram produkten.
-          </p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">POS</p>
+              <h2 className="mt-1 text-xl font-semibold text-zinc-900">Kassa</h2>
+              <p className="mt-1 text-xs font-bold text-blue-700">{store.name}</p>
+            </div>
+            {isAdmin && allStores && allStores.length > 1 ? (
+              <select
+                value={store.id}
+                onChange={(e) => { window.location.href = `/kassa?storeId=${e.target.value}`; }}
+                className="min-h-9 cursor-pointer rounded-xl border border-zinc-200 bg-zinc-50 px-2 text-xs font-semibold text-zinc-700 outline-none focus:border-blue-300"
+              >
+                {allStores.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            ) : null}
+          </div>
         </div>
 
         <form
           action={searchProducts}
-          className="sticky top-[73px] z-30 flex flex-col gap-3 rounded-3xl border border-zinc-200 bg-white/95 p-3 text-sm font-medium text-zinc-700 shadow-sm backdrop-blur"
+          className="sticky top-18.25 z-30 flex flex-col gap-3 rounded-3xl border border-zinc-200 bg-white/95 p-3 text-sm font-medium text-zinc-700 shadow-sm backdrop-blur"
         >
           <label htmlFor="kassa-search" className="flex flex-col gap-1">
             Sök eller scanna
@@ -322,6 +344,7 @@ export function KassaClient({ store, isAdmin = false }: KassaClientProps) {
         saving={saving}
         isAdmin={isAdmin}
         onChangeQuantity={changeQuantity}
+        onSetQuantity={setExactQuantity}
         onCancelCart={cancelCart}
         onCompleteSale={completeSale}
       />
@@ -357,8 +380,8 @@ function SearchResultPopup({
   const groupedResults = groupSearchResults(results);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-zinc-950/35 px-3 pb-3 pt-10 lg:items-center lg:p-6">
-      <section className="max-h-[88vh] w-full max-w-[430px] overflow-y-auto rounded-[2rem] bg-[#f3eee5] p-4 shadow-2xl lg:max-w-xl">
+    <div className="fixed inset-0 z-90 flex items-end justify-center bg-zinc-950/35 px-3 pb-3 pt-10 lg:items-center lg:p-6" onClick={onClose}>
+      <section className="max-h-[88vh] w-full max-w-107.5 overflow-y-auto rounded-4xl bg-[#f3eee5] p-4 shadow-2xl lg:max-w-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-orange-600">
@@ -378,7 +401,7 @@ function SearchResultPopup({
           </button>
         </div>
 
-        <div className="mt-4 flex flex-col gap-3">
+        <div className="mt-4 flex flex-wrap gap-3">
           {groupedResults.map((group) => (
             <SearchProductCard
               key={group.productId}
@@ -411,93 +434,84 @@ function SearchProductCard({
   const selectedItem =
     group.options.find((item) => itemKey(item) === selectedKey) ??
     group.options[0];
-  const hasVariants = group.options.length > 1 || selectedItem.variantId;
+  const hasVariants = group.options.length > 1;
+  const outOfStock = selectedItem.stockQuantity <= 0;
 
   return (
-    <article className="rounded-[1.75rem] border border-[#dfd4c6] bg-[#f8f4ed] p-4 shadow-sm">
-      <div className="grid grid-cols-[112px_1fr] gap-4">
-        <ProductImageLarge
-          imageUrl={selectedItem.imageUrl ?? group.imageUrl}
-          name={group.productName}
-        />
-        <div className="min-w-0">
-          <p className="text-xl font-bold leading-6 text-[#43342c]">
-            {group.productName}
-          </p>
-          <p className="mt-2 line-clamp-3 text-xs leading-5 text-[#75675d]">
-            {selectedItem.description}
-          </p>
-        </div>
+    <article
+      className={`flex w-[calc(50%-6px)] flex-col overflow-hidden rounded-2xl shadow-sm transition-transform active:scale-95 ${
+        outOfStock
+          ? "border border-red-200 bg-red-50"
+          : "cursor-pointer border border-[#dfd4c6] bg-[#f8f4ed] hover:border-orange-300"
+      }`}
+      onClick={() => { if (!outOfStock) onAdd(selectedItem); }}
+    >
+      <ProductImageSquare
+        imageUrl={selectedItem.imageUrl ?? group.imageUrl}
+        name={group.productName}
+        dimmed={outOfStock}
+      />
+
+      <div className="p-2.5">
+        <p className={`line-clamp-1 text-xs font-semibold leading-4 ${outOfStock ? "text-zinc-400" : "text-[#43342c]"}`}>
+          {group.productName}
+        </p>
+        <p className={`mt-0.5 text-sm font-bold ${outOfStock ? "text-zinc-400" : "text-orange-700"}`}>
+          {formatPrice(selectedItem.price)} kr
+        </p>
+        <p className={`mt-0.5 text-[10px] font-semibold ${outOfStock ? "text-red-400" : "text-zinc-400"}`}>
+          {outOfStock ? "Slut i lager" : `${selectedItem.stockQuantity} st i lager`}
+        </p>
       </div>
 
       {hasVariants ? (
-        <label className="mt-4 flex flex-col gap-1 text-sm font-bold text-[#43342c]">
-          Förpackning
+        <div
+          className={`border-t px-2.5 pb-2.5 pt-2 ${outOfStock ? "border-zinc-200" : "border-[#dfd4c6]"}`}
+          onClick={(e) => e.stopPropagation()}
+        >
           <select
             value={selectedKey}
             onChange={(event) => setSelectedKey(event.target.value)}
-            className="min-h-11 cursor-pointer rounded-xl border border-[#c9bdae] bg-white px-3 text-sm font-semibold text-[#43342c] outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-500/10"
+            disabled={outOfStock}
+            className="w-full cursor-pointer rounded-lg border border-[#c9bdae] bg-white px-2 py-1.5 text-xs text-[#43342c] outline-none focus:border-orange-300 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {group.options.map((item) => (
               <option key={itemKey(item)} value={itemKey(item)}>
-                {item.variantName ?? "Standard"} - {formatPrice(item.price)} kr
+                {item.variantName ?? "Standard"} – {formatPrice(item.price)} kr
               </option>
             ))}
           </select>
-        </label>
+        </div>
       ) : null}
 
-      <div className="mt-3 grid grid-cols-[44px_1fr_44px] items-center gap-2">
+      <div className="px-2.5 pb-2.5" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
-          className="min-h-10 rounded-xl bg-orange-500 text-lg font-bold text-white opacity-60"
-          aria-label="Minska antal"
-          disabled
+          onClick={() => { if (!outOfStock) onAdd(selectedItem); }}
+          disabled={outOfStock}
+          className="min-h-10 w-full cursor-pointer rounded-xl bg-orange-500 px-4 text-xs font-bold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          -
-        </button>
-        <p className="rounded-xl border border-[#d9cec0] bg-white py-2 text-center text-sm font-bold text-[#43342c]">
-          1
-        </p>
-        <button
-          type="button"
-          className="min-h-10 rounded-xl bg-orange-500 text-lg font-bold text-white opacity-60"
-          aria-label="Öka antal"
-          disabled
-        >
-          +
+          Lägg till i varukorg
         </button>
       </div>
-
-      <div className="mt-4 overflow-hidden rounded-2xl border border-[#dfd4c6]">
-        <ProductFact label="Pris" value={`${formatPrice(selectedItem.price)} kr`} />
-        <ProductFact label="Lager" value={`${selectedItem.stockQuantity} st`} />
-        <ProductFact label="EAN" value={selectedItem.ean ?? "-"} />
-        <ProductFact label="Lagerplats" value={selectedItem.stockLocation ?? "-"} />
-      </div>
-
-      <button
-        type="button"
-        onClick={() => onAdd(selectedItem)}
-        disabled={selectedItem.stockQuantity <= 0}
-        className="mt-4 min-h-12 w-full cursor-pointer rounded-xl bg-orange-500 px-4 text-sm font-bold text-white shadow-sm shadow-orange-200 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        Lägg till i varukorg
-      </button>
     </article>
   );
 }
 
-function ProductImageLarge({
+function ProductImageSquare({
   imageUrl,
   name,
+  dimmed = false,
 }: {
   imageUrl: string | null;
   name: string;
+  dimmed?: boolean;
 }) {
+  const base = `aspect-square w-full bg-contain bg-center bg-no-repeat transition-opacity ${dimmed ? "opacity-40" : ""}`;
+
   if (!imageUrl) {
     return (
-      <div className="flex h-44 w-28 shrink-0 items-center justify-center rounded-3xl bg-white text-xs font-bold text-orange-600">
+      <div className={`flex items-center justify-center bg-zinc-50 text-xs font-bold text-orange-600 ${base}`}>
         Bild
       </div>
     );
@@ -507,20 +521,12 @@ function ProductImageLarge({
     <div
       aria-label={name}
       role="img"
-      className="h-44 w-28 shrink-0 rounded-3xl border border-[#dfd4c6] bg-white bg-contain bg-center bg-no-repeat"
+      className={`bg-white ${base}`}
       style={{ backgroundImage: `url("${imageUrl}")` }}
     />
   );
 }
 
-function ProductFact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-[#dfd4c6] bg-[#f3eee5] px-3 py-2 text-xs last:border-b-0">
-      <p className="font-bold text-[#6a5b50]">{label}</p>
-      <p className="max-w-36 text-right font-bold text-blue-700">{value}</p>
-    </div>
-  );
-}
 
 function CartItemImage({
   imageUrl,
@@ -580,6 +586,7 @@ function CartPanel({
   saving,
   isAdmin,
   onChangeQuantity,
+  onSetQuantity,
   onCancelCart,
   onCompleteSale,
 }: {
@@ -588,6 +595,7 @@ function CartPanel({
   saving: boolean;
   isAdmin: boolean;
   onChangeQuantity: (cartKey: string, change: number) => void;
+  onSetQuantity: (cartKey: string, value: number) => void;
   onCancelCart: () => void;
   onCompleteSale: () => void;
 }) {
@@ -615,9 +623,9 @@ function CartPanel({
                     <p className="line-clamp-2 text-sm font-semibold leading-5 text-zinc-900">
                       {item.name}
                     </p>
-                    <p className="mt-0.5 text-xs text-zinc-500">
-                      {item.variantName ?? "Enkel produkt"}
-                    </p>
+                    {item.variantName ? (
+                      <p className="mt-0.5 text-xs text-zinc-500">{item.variantName}</p>
+                    ) : null}
                     <div className="mt-1 flex flex-wrap gap-1 text-[11px] font-semibold text-zinc-500">
                       <span className="rounded-full bg-zinc-100 px-2 py-1">
                         EAN {item.ean ?? "-"}
@@ -625,31 +633,45 @@ function CartPanel({
                       <span className="rounded-full bg-zinc-100 px-2 py-1">
                         Plats {item.stockLocation ?? "-"}
                       </span>
+                      <span className="rounded-full bg-zinc-100 px-2 py-1">
+                        Lager {item.maxQuantity} st
+                      </span>
                     </div>
-                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-zinc-400">
-                      {item.description}
-                    </p>
                   </div>
                   <p className="shrink-0 text-sm font-semibold text-zinc-900">
                     {formatPrice(item.unitPrice * item.quantity)} kr
                   </p>
                 </div>
 
-                <div className="mt-2 grid grid-cols-[44px_1fr_44px] items-center gap-2">
+                <div className="mt-2 grid grid-cols-[36px_1fr_36px] items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => onChangeQuantity(item.cartKey, -1)}
-                    className="min-h-10 cursor-pointer rounded-xl border border-zinc-200 text-lg font-semibold"
+                    className="min-h-9 cursor-pointer rounded-xl border border-zinc-200 text-base font-semibold transition hover:bg-zinc-50"
                   >
                     -
                   </button>
-                  <p className="text-center text-sm font-semibold text-zinc-900">
-                    {item.quantity} st
-                  </p>
+                  <input
+                    type="number"
+                    min={1}
+                    max={item.maxQuantity}
+                    value={item.quantity}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val) && val >= 1) {
+                        onSetQuantity(item.cartKey, val);
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      onSetQuantity(item.cartKey, isNaN(val) || val < 1 ? 1 : val);
+                    }}
+                    className="min-h-9 w-full rounded-xl border border-zinc-200 text-center text-sm font-semibold text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
                   <button
                     type="button"
                     onClick={() => onChangeQuantity(item.cartKey, 1)}
-                    className="min-h-10 cursor-pointer rounded-xl border border-zinc-200 text-lg font-semibold"
+                    className="min-h-9 cursor-pointer rounded-xl border border-zinc-200 text-base font-semibold transition hover:bg-zinc-50"
                   >
                     +
                   </button>

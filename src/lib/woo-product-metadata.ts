@@ -33,6 +33,10 @@ export function isIgnoredWooMetaKey(key: string): boolean {
     return true;
   }
 
+  if (normalized.startsWith("cwg_")) {
+    return true;
+  }
+
   if (normalized.startsWith("_")) {
     return true;
   }
@@ -195,7 +199,9 @@ export function collectAvailableMetaKeys(
     }
 
     for (const key of Object.keys(metadata)) {
-      keys.add(key);
+      if (!isIgnoredWooMetaKey(key)) {
+        keys.add(key);
+      }
     }
   }
 

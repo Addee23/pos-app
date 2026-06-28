@@ -8,6 +8,7 @@ export const saleItemInputSchema = z.object({
 
 export const saleCreateSchema = z.object({
   items: z.array(saleItemInputSchema).min(1, "Kassan är tom"),
+  storeId: z.string().optional(),
 });
 
 export type SaleCreateInput = z.infer<typeof saleCreateSchema>;

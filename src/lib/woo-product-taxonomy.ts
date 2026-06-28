@@ -37,7 +37,12 @@ export function extractWooCategory(product: WooObject): string | null {
 }
 
 export function extractWooBrand(product: WooObject): string | null {
+  // Kolla WooCommerce brands-taxonomin (t.ex. från plugin Perfect Brands)
+  const brandsArray = asArray(product.brands).map(asObject);
+  const taxonomyBrand = brandsArray[0] ? asString(brandsArray[0].name) : null;
+
   const raw =
+    taxonomyBrand ??
     extractWooAttribute(product, BRAND_ATTRIBUTE_NAMES) ??
     extractWooMetaString(product, ["brand", "_brand", "varumarke"]);
 

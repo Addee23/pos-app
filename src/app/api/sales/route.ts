@@ -4,21 +4,17 @@ import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { saleCreateSchema } from "@/lib/validations/sale";
 import { StockMovementType } from "@/generated/prisma/client";
+import {
+  hasWooCredentials,
+  updateWooProductStock,
+  updateWooVariantStock,
+} from "@/lib/woocommerce-api";
 
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Ej inloggad" }, { status: 401 });
   }
-
-  if (!session.user.storeId) {
-    return NextResponse.json(
-      { error: "Användaren saknar butik" },
-      { status: 400 },
-    );
-  }
-
-  const storeId = session.user.storeId;
 
   const checkoutLimit = rateLimit({
     key: `checkout:${session.user.id}`,
@@ -43,38 +39,62 @@ export async function POST(request: Request) {
     );
   }
 
+  // Bestäm butik: admin använder storeId från body, personal hämtar från DB.
+  const isAdmin = session.user.role === "ADMIN";
+  let storeId: string;
+
+  if (isAdmin) {
+    if (!parsed.data.storeId) {
+      return NextResponse.json({ error: "Ange storeId" }, { status: 400 });
+    }
+    const storeExists = await prisma.store.findUnique({
+      where: { id: parsed.data.storeId },
+      select: { id: true },
+    });
+    if (!storeExists) {
+      return NextResponse.json({ error: "Butiken hittades inte" }, { status: 404 });
+    }
+    storeId = parsed.data.storeId;
+  } else {
+    const freshUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { storeId: true },
+    });
+    if (!freshUser?.storeId) {
+      return NextResponse.json({ error: "Användaren saknar butik" }, { status: 400 });
+    }
+    storeId = freshUser.storeId;
+  }
+
+  type SaleLineItem = {
+    productId: string;
+    variantId?: string;
+    wooProductId: number;
+    wooVariantId?: number;
+    productName: string;
+    variantName?: string;
+    ean?: string | null;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+    quantityBefore: number;
+    quantityAfter: number;
+  };
+
   try {
-    const sale = await prisma.$transaction(async (tx) => {
-      const preparedItems: Array<{
-        productId: string;
-        variantId?: string;
-        productName: string;
-        variantName?: string;
-        ean?: string | null;
-        quantity: number;
-        unitPrice: number;
-        lineTotal: number;
-        quantityBefore: number;
-        quantityAfter: number;
-      }> = [];
+    const { sale, items: saleLineItems } = await prisma.$transaction(async (tx) => {
+      const preparedItems: SaleLineItem[] = [];
 
       for (const item of parsed.data.items) {
         if (item.variantId) {
           const variant = await tx.productVariant.findFirst({
-            where: {
-              id: item.variantId,
-              productId: item.productId,
-            },
+            where: { id: item.variantId, productId: item.productId },
           });
-
           const product = await tx.product.findFirst({
             where: { id: item.productId, storeId },
           });
 
-          if (!variant || !product) {
-            throw new Error("VARIANT_NOT_FOUND");
-          }
-
+          if (!variant || !product) throw new Error("VARIANT_NOT_FOUND");
           if (variant.stockQuantity < item.quantity) {
             throw new Error(`OUT_OF_STOCK:${product.name} ${variant.name}`);
           }
@@ -82,6 +102,8 @@ export async function POST(request: Request) {
           preparedItems.push({
             productId: variant.productId,
             variantId: variant.id,
+            wooProductId: product.wooProductId,
+            wooVariantId: variant.wooVariantId ?? undefined,
             productName: product.name,
             variantName: variant.name,
             ean: variant.ean,
@@ -91,28 +113,21 @@ export async function POST(request: Request) {
             quantityBefore: variant.stockQuantity,
             quantityAfter: variant.stockQuantity - item.quantity,
           });
-
           continue;
         }
 
         const product = await tx.product.findFirst({
-          where: {
-            id: item.productId,
-            storeId,
-            variants: { none: {} },
-          },
+          where: { id: item.productId, storeId, variants: { none: {} } },
         });
 
-        if (!product) {
-          throw new Error("PRODUCT_NOT_FOUND");
-        }
-
+        if (!product) throw new Error("PRODUCT_NOT_FOUND");
         if (product.stockQuantity < item.quantity) {
           throw new Error(`OUT_OF_STOCK:${product.name}`);
         }
 
         preparedItems.push({
           productId: product.id,
+          wooProductId: product.wooProductId,
           productName: product.name,
           ean: product.ean,
           quantity: item.quantity,
@@ -126,11 +141,7 @@ export async function POST(request: Request) {
       const total = preparedItems.reduce((sum, item) => sum + item.lineTotal, 0);
 
       const createdSale = await tx.sale.create({
-        data: {
-          storeId,
-          userId: session.user.id,
-          total,
-        },
+        data: { storeId, userId: session.user.id, total },
       });
 
       for (const item of preparedItems) {
@@ -148,7 +159,6 @@ export async function POST(request: Request) {
           },
         });
 
-        // Lager minskas bara efter att SaleItem finns, så StockMovement kan peka på rätt rad.
         if (item.variantId) {
           await tx.productVariant.update({
             where: { id: item.variantId },
@@ -177,11 +187,15 @@ export async function POST(request: Request) {
         });
       }
 
-      return tx.sale.findUniqueOrThrow({
+      const completedSale = await tx.sale.findUniqueOrThrow({
         where: { id: createdSale.id },
         include: { items: true },
       });
+
+      return { sale: completedSale, items: preparedItems };
     });
+
+    void syncSaleStockToWoo(storeId, saleLineItems);
 
     return NextResponse.json(sale, { status: 201 });
   } catch (error) {
@@ -212,6 +226,45 @@ export async function POST(request: Request) {
   }
 }
 
+async function syncSaleStockToWoo(
+  storeId: string,
+  items: Array<{ wooProductId: number; wooVariantId?: number; quantityAfter: number }>,
+): Promise<void> {
+  try {
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { wooUrl: true, wooConsumerKey: true, wooConsumerSecret: true },
+    });
+    if (!store) {
+      console.warn("[Woo stock sync] Butik hittades inte:", storeId);
+      return;
+    }
+    if (!hasWooCredentials(store)) {
+      console.warn("[Woo stock sync] WooCommerce ej konfigurerat för butik:", storeId);
+      return;
+    }
+    console.log("[Woo stock sync] Startar sync för", items.length, "produkt(er)...");
+    await Promise.all(
+      items.map(async (item) => {
+        try {
+          if (item.wooVariantId) {
+            await updateWooVariantStock(store, item.wooProductId, item.wooVariantId, item.quantityAfter);
+            console.log(`[Woo stock sync] Variant ${item.wooVariantId} → ${item.quantityAfter} i lager`);
+          } else {
+            await updateWooProductStock(store, item.wooProductId, item.quantityAfter);
+            console.log(`[Woo stock sync] Produkt ${item.wooProductId} → ${item.quantityAfter} i lager`);
+          }
+        } catch (itemErr) {
+          console.error(`[Woo stock sync] Misslyckades för produkt ${item.wooProductId}:`, itemErr);
+        }
+      }),
+    );
+    console.log("[Woo stock sync] Klar.");
+  } catch (err) {
+    console.error("[Woo stock sync] Oväntat fel:", err);
+  }
+}
+
 async function readJsonBody(
   request: Request,
 ): Promise<{ ok: true; data: unknown } | { ok: false }> {
@@ -224,12 +277,7 @@ async function readJsonBody(
 
 function tooManyRequests(retryAfterSeconds: number) {
   return NextResponse.json(
-    {
-      error: `För många köp. Vänta ${retryAfterSeconds} sekunder och försök igen.`,
-    },
-    {
-      status: 429,
-      headers: { "Retry-After": String(retryAfterSeconds) },
-    },
+    { error: `För många köp. Vänta ${retryAfterSeconds} sekunder och försök igen.` },
+    { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } },
   );
 }

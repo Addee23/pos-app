@@ -22,6 +22,7 @@ type PickupItem = {
   productSlug: string | null;
   productImageUrl: string | null;
   quantity: number;
+  stockLocation: string | null;
 };
 
 type PickupUser = {
@@ -274,10 +275,6 @@ export function PickupClient({
         <h2 className="mt-1 text-xl font-semibold text-zinc-900">
           Upphämtningar
         </h2>
-        <p className="mt-2 text-sm leading-6 text-zinc-500">
-          Packa order under &quot;Ska packas&quot;, skicka bekräftelse till kunden,
-          och markera som hämtad när kunden kommer. Listan uppdateras varje minut.
-        </p>
 
         <PickupDashboardTabs
           activeTab={activeTab}
@@ -528,8 +525,8 @@ function PickupPopup({
   onComplete: (pickupId: string) => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-zinc-950/35 px-3 pb-3 pt-10 lg:items-center lg:p-6">
-      <section className="max-h-[88vh] w-full max-w-[430px] overflow-y-auto rounded-[2rem] bg-[#f3eee5] p-4 shadow-2xl lg:max-w-xl">
+    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-zinc-950/35 px-3 pb-3 pt-10 lg:items-center lg:p-6" onClick={onClose}>
+      <section className="max-h-[88vh] w-full max-w-[430px] overflow-y-auto rounded-[2rem] bg-[#f3eee5] p-4 shadow-2xl lg:max-w-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-orange-600">
@@ -539,14 +536,23 @@ function PickupPopup({
               Kontrollera ordern
             </h3>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-white/80 text-sm font-bold text-zinc-500"
-            aria-label="Stäng upphämtning"
-          >
-            x
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="cursor-pointer rounded-xl border border-[#dfd4c6] bg-white px-3 py-2 text-xs font-bold text-[#43342c] transition hover:border-orange-300 hover:text-orange-700 print:hidden"
+            >
+              Skriv ut plocklista
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-white/80 text-sm font-bold text-zinc-500"
+              aria-label="Stäng upphämtning"
+            >
+              x
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-col gap-3">
@@ -558,7 +564,6 @@ function PickupPopup({
               currentRole={currentRole}
               onCancel={onCancel}
               onPack={onPack}
-              onComplete={onComplete}
             />
           ))}
         </div>
@@ -592,24 +597,21 @@ function PickupCard({
 
   return (
     <article className="rounded-lg border border-zinc-200 bg-white p-4">
-      <div className="flex items-start gap-3">
-        <PickupItemImage item={pickup.items[0]} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-base font-semibold text-zinc-900">
-              {pickup.customerName}
-            </p>
-            <StatusBadge status={pickup.status} />
-          </div>
-          <p className="mt-1 text-sm font-medium text-zinc-600">
-            {pickup.pickupCode}
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-base font-semibold text-zinc-900">
+            {pickup.customerName}
           </p>
-          <p className="mt-1 line-clamp-1 text-sm text-zinc-500">
-            {pickup.items.length > 0
-              ? pickup.items.map(itemLabel).join(", ")
-              : "Produktinfo saknas"}
-          </p>
+          <StatusBadge status={pickup.status} />
         </div>
+        <p className="mt-1 text-sm font-medium text-zinc-600">
+          {pickup.pickupCode}
+        </p>
+        <p className="mt-1 line-clamp-1 text-sm text-zinc-500">
+          {pickup.items.length > 0
+            ? pickup.items.map(itemLabel).join(", ")
+            : "Produktinfo saknas"}
+        </p>
       </div>
 
       {pickup.notes ? (
@@ -627,14 +629,16 @@ function PickupCard({
           Visa
         </button>
         {canPack ? (
-          <button
-            type="button"
-            disabled={isSaving}
-            onClick={() => onPack(pickup.id)}
-            className="min-h-10 cursor-pointer rounded-lg bg-orange-500 px-3 text-sm font-semibold text-white shadow-sm shadow-orange-200 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:shadow-none"
-          >
-            {isSaving ? "Packar..." : "Markera packad"}
-          </button>
+          <label className={`flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 text-sm font-semibold text-orange-700 transition hover:bg-orange-100 ${isSaving ? "cursor-not-allowed opacity-60" : ""}`}>
+            <input
+              type="checkbox"
+              checked={false}
+              disabled={isSaving}
+              onChange={() => onPack(pickup.id)}
+              className="size-4 cursor-pointer accent-orange-500"
+            />
+            {isSaving ? "Sparar..." : "Markera plockad"}
+          </label>
         ) : (
           <button
             type="button"
@@ -643,7 +647,7 @@ function PickupCard({
             className="min-h-10 cursor-pointer rounded-lg bg-accent px-3 text-sm font-semibold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:shadow-none"
           >
             {pickup.status === "PICKED_UP"
-              ? "Hämtad"
+              ? "✓ Hämtad"
               : isSaving
                 ? "Sparar..."
                 : "Markera hämtad"}
@@ -678,20 +682,39 @@ function PickupInfoCard({
   currentRole,
   onCancel,
   onPack,
-  onComplete,
 }: {
   pickup: Pickup;
   isSaving: boolean;
   currentRole: UserRole;
   onCancel: (pickupId: string) => void;
   onPack: (pickupId: string) => void;
-  onComplete: (pickupId: string) => void;
 }) {
+  const toast = useToast();
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const canPack = pickup.status === "AWAITING_PACK";
-  const canComplete = pickup.status === "READY";
   const canCancel =
     currentRole === "ADMIN" &&
     (pickup.status === "AWAITING_PACK" || pickup.status === "READY");
+
+  function toggleItem(id: string) {
+    setCheckedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function warnIfIncomplete(action: () => void) {
+    const total = pickup.items.length;
+    const checked = checkedItems.size;
+    if (total > 0 && checked < total) {
+      toast.warning(
+        `${checked} av ${total} varor är avprickade. Kontrollera att du plockat allt.`,
+      );
+    }
+    action();
+  }
 
   return (
     <article className="rounded-[1.75rem] border border-[#dfd4c6] bg-[#f8f4ed] p-4 shadow-sm">
@@ -710,7 +733,12 @@ function PickupInfoCard({
       <div className="mt-4 flex flex-col gap-2">
         {pickup.items.length > 0 ? (
           pickup.items.map((item) => (
-            <PickupProductRow key={item.id} item={item} />
+            <PickupProductRow
+              key={item.id}
+              item={item}
+              checked={checkedItems.has(item.id)}
+              onToggle={canPack ? () => toggleItem(item.id) : undefined}
+            />
           ))
         ) : (
           <p className="rounded-2xl bg-white px-3 py-4 text-sm text-[#75675d]">
@@ -742,25 +770,12 @@ function PickupInfoCard({
         <button
           type="button"
           disabled={isSaving}
-          onClick={() => onPack(pickup.id)}
+          onClick={() => warnIfIncomplete(() => onPack(pickup.id))}
           className="mt-4 min-h-12 w-full cursor-pointer rounded-xl bg-orange-500 px-4 text-sm font-bold text-white shadow-sm shadow-orange-200 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSaving ? "Packar..." : "Markera som packad och skicka mail"}
         </button>
-      ) : (
-        <button
-          type="button"
-          disabled={!canComplete || isSaving}
-          onClick={() => onComplete(pickup.id)}
-          className="mt-4 min-h-12 w-full cursor-pointer rounded-xl bg-orange-500 px-4 text-sm font-bold text-white shadow-sm shadow-orange-200 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {pickup.status === "PICKED_UP"
-            ? "Redan hämtad"
-            : isSaving
-              ? "Sparar..."
-              : "Markera hämtad"}
-        </button>
-      )}
+      ) : null}
 
       {canCancel ? (
         <button
@@ -776,24 +791,51 @@ function PickupInfoCard({
   );
 }
 
-function PickupProductRow({ item }: { item: PickupItem }) {
+function PickupProductRow({
+  item,
+  checked,
+  onToggle,
+}: {
+  item: PickupItem;
+  checked: boolean;
+  onToggle?: () => void;
+}) {
+  if (!onToggle) {
+    return (
+      <div className="rounded-2xl bg-white p-3">
+        <p className="text-sm font-bold text-[#43342c]">{itemLabel(item)}</p>
+        <p className="mt-1 text-xs font-semibold text-orange-700">Antal: {item.quantity}</p>
+        <p className={`mt-1 text-xs font-semibold ${item.stockLocation ? "text-[#43342c]" : "text-zinc-400"}`}>
+          Hylla: {item.stockLocation ?? "Saknas"}
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-[72px_1fr] gap-3 rounded-2xl bg-white p-3">
-      <PickupItemImage item={item} large />
+    <label
+      className={`flex cursor-pointer items-start gap-3 rounded-2xl p-3 transition ${
+        checked ? "bg-emerald-50" : "bg-white"
+      }`}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onToggle}
+        className="mt-0.5 size-5 shrink-0 cursor-pointer accent-emerald-600"
+      />
       <div className="min-w-0">
-        <p className="line-clamp-2 text-sm font-bold text-[#43342c]">
+        <p className={`text-sm font-bold transition ${checked ? "text-zinc-400 line-through" : "text-[#43342c]"}`}>
           {itemLabel(item)}
         </p>
-        <p className="mt-1 text-xs font-semibold text-orange-700">
+        <p className={`mt-1 text-xs font-semibold ${checked ? "text-zinc-400" : "text-orange-700"}`}>
           Antal: {item.quantity}
         </p>
-        {item.productSlug ? (
-          <p className="mt-2 truncate text-xs text-[#75675d]">
-            Slug: {item.productSlug}
-          </p>
-        ) : null}
+        <p className={`mt-1 text-xs font-semibold ${item.stockLocation ? (checked ? "text-zinc-400" : "text-[#43342c]") : "text-zinc-400"}`}>
+          Hylla: {item.stockLocation ?? "Saknas"}
+        </p>
       </div>
-    </div>
+    </label>
   );
 }
 

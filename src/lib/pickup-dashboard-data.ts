@@ -1,24 +1,9 @@
 import { PickupStatus } from "@/generated/prisma/client";
 import { PICKUP_DASHBOARD_LIMIT } from "@/lib/pickup-dashboard";
 import { prisma } from "@/lib/prisma";
-import { serializePickup, type SerializedPickup } from "@/lib/pickup-serialize";
+import { pickupResponseInclude, serializePickup, type SerializedPickup } from "@/lib/pickup-serialize";
 
-const pickupInclude = {
-  packedBy: { select: { name: true, email: true } },
-  pickedUpBy: { select: { name: true, email: true } },
-  cancelledBy: { select: { name: true, email: true } },
-  items: {
-    orderBy: { createdAt: "asc" as const },
-    select: {
-      id: true,
-      productName: true,
-      variantName: true,
-      productSlug: true,
-      productImageUrl: true,
-      quantity: true,
-    },
-  },
-} as const;
+const pickupInclude = pickupResponseInclude;
 
 export type PickupDashboardPayload = {
   needsHandling: SerializedPickup[];

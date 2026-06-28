@@ -110,8 +110,8 @@ function SearchInfoPopup({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-zinc-950/35 px-3 pb-3 pt-10 lg:items-center lg:p-6">
-      <section className="max-h-[88vh] w-full max-w-[430px] overflow-y-auto rounded-[2rem] bg-[#f3eee5] p-4 shadow-2xl lg:max-w-xl">
+    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-zinc-950/35 px-3 pb-3 pt-10 lg:items-center lg:p-6" onClick={onClose}>
+      <section className="max-h-[88vh] w-full max-w-[430px] overflow-y-auto rounded-[2rem] bg-[#f3eee5] p-4 shadow-2xl lg:max-w-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-orange-600">
@@ -131,7 +131,7 @@ function SearchInfoPopup({
           </button>
         </div>
 
-        <div className="mt-4 flex flex-col gap-3">
+        <div className="mt-4 flex flex-wrap gap-3">
           {products.map((product) => (
             <SearchInfoCard
               key={product.id}
@@ -147,7 +147,7 @@ function SearchInfoPopup({
 
 function SearchInfoCard({
   product,
-  onClose,
+  onClose: _onClose,
 }: {
   product: SearchProduct;
   onClose: () => void;
@@ -157,63 +157,64 @@ function SearchInfoCard({
   const selectedOption =
     options.find((option) => option.key === selectedKey) ?? options[0];
   const hasVariants = options.length > 1 || selectedOption.variantName !== null;
+  const outOfStock = selectedOption.stockQuantity <= 0;
 
   return (
-    <article className="rounded-[1.75rem] border border-[#dfd4c6] bg-[#f8f4ed] p-4 shadow-sm">
-      <div className="grid grid-cols-[112px_1fr] gap-4">
-        <ProductImageLarge
-          imageUrl={selectedOption.imageUrl ?? product.imageUrl}
-          name={product.name}
-        />
-        <div className="min-w-0">
-          <p className="text-xl font-bold leading-6 text-[#43342c]">
-            {product.name}
-          </p>
-          <p className="mt-1 text-xs font-semibold text-orange-700">
-            {product.storeName}
-          </p>
-          <p className="mt-2 line-clamp-4 text-xs leading-5 text-[#75675d]">
-            {selectedOption.description}
-          </p>
-        </div>
-      </div>
+    <article
+      className={`flex w-[calc(50%-6px)] flex-col overflow-hidden rounded-2xl shadow-sm ${
+        outOfStock
+          ? "border border-red-200 bg-red-50"
+          : "border border-[#dfd4c6] bg-[#f8f4ed]"
+      }`}
+    >
+      <ProductImageSquare
+        imageUrl={selectedOption.imageUrl ?? product.imageUrl}
+        name={product.name}
+        dimmed={outOfStock}
+      />
 
-      {hasVariants ? (
-        <label className="mt-4 flex flex-col gap-1 text-sm font-bold text-[#43342c]">
-          Förpackning
+      <div className="flex flex-1 flex-col p-2.5">
+        <p className={`line-clamp-1 text-xs font-semibold leading-4 ${outOfStock ? "text-zinc-400" : "text-[#43342c]"}`}>
+          {product.name}
+        </p>
+        <p className={`mt-0.5 text-[10px] font-semibold ${outOfStock ? "text-zinc-400" : "text-orange-700"}`}>
+          {product.storeName}
+        </p>
+        <p className={`mt-0.5 text-sm font-bold ${outOfStock ? "text-zinc-400" : "text-[#43342c]"}`}>
+          {formatPrice(selectedOption.price)} kr
+        </p>
+        <p className={`mt-0.5 text-[10px] font-semibold ${outOfStock ? "text-red-400" : "text-zinc-400"}`}>
+          {outOfStock ? "Slut i lager" : `${selectedOption.stockQuantity} st i lager`}
+        </p>
+
+        {hasVariants ? (
           <select
             value={selectedKey}
             onChange={(event) => setSelectedKey(event.target.value)}
-            className="min-h-11 cursor-pointer rounded-xl border border-[#c9bdae] bg-white px-3 text-sm font-semibold text-[#43342c] outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-500/10"
+            className="mt-2 w-full cursor-pointer rounded-lg border border-[#c9bdae] bg-white px-2 py-1.5 text-xs text-[#43342c] outline-none focus:border-orange-300"
           >
             {options.map((option) => (
               <option key={option.key} value={option.key}>
-                {option.variantName ?? "Standard"} - {formatPrice(option.price)} kr
+                {option.variantName ?? "Standard"} – {formatPrice(option.price)} kr
               </option>
             ))}
           </select>
-        </label>
-      ) : null}
+        ) : null}
 
-      <div className="mt-4 overflow-hidden rounded-2xl border border-[#dfd4c6]">
-        <ProductFact label="Pris" value={`${formatPrice(selectedOption.price)} kr`} />
-        <ProductFact label="EAN" value={selectedOption.ean ?? "-"} />
-        <ProductFact label="Slug" value={product.slug} />
+        <div className="mt-2 overflow-hidden rounded-xl border border-[#dfd4c6]">
+          <ProductFact label="EAN" value={selectedOption.ean ?? "-"} />
+          <ProductFact label="Lager" value={`${selectedOption.stockQuantity} st`} />
+          <ProductFact label="Slug" value={product.slug} />
+        </div>
+
+        {product.category || product.brand || product.country ? (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {product.category ? <TaxonomyChip label={product.category} /> : null}
+            {product.brand ? <TaxonomyChip label={product.brand} /> : null}
+            {product.country ? <TaxonomyChip label={product.country} /> : null}
+          </div>
+        ) : null}
       </div>
-
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {product.category ? <TaxonomyChip label={product.category} /> : null}
-        {product.brand ? <TaxonomyChip label={product.brand} /> : null}
-        {product.country ? <TaxonomyChip label={product.country} /> : null}
-      </div>
-
-      <button
-        type="button"
-        onClick={onClose}
-        className="mt-4 min-h-12 w-full cursor-pointer rounded-xl bg-orange-500 px-4 text-sm font-bold text-white shadow-sm shadow-orange-200 transition hover:bg-orange-600"
-      >
-        Stäng
-      </button>
     </article>
   );
 }
@@ -261,16 +262,20 @@ function getProductOptions(product: SearchProduct): ProductOption[] {
   ];
 }
 
-function ProductImageLarge({
+function ProductImageSquare({
   imageUrl,
   name,
+  dimmed = false,
 }: {
   imageUrl: string | null;
   name: string;
+  dimmed?: boolean;
 }) {
+  const base = `aspect-square w-full bg-contain bg-center bg-no-repeat transition-opacity ${dimmed ? "opacity-40" : ""}`;
+
   if (!imageUrl) {
     return (
-      <div className="flex h-44 w-28 shrink-0 items-center justify-center rounded-3xl bg-white text-xs font-bold text-orange-600">
+      <div className={`flex items-center justify-center bg-zinc-50 text-xs font-bold text-orange-600 ${base}`}>
         Bild
       </div>
     );
@@ -280,7 +285,7 @@ function ProductImageLarge({
     <div
       aria-label={name}
       role="img"
-      className="h-44 w-28 shrink-0 rounded-3xl border border-[#dfd4c6] bg-white bg-contain bg-center bg-no-repeat"
+      className={`bg-white ${base}`}
       style={{ backgroundImage: `url("${imageUrl}")` }}
     />
   );

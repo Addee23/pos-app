@@ -58,6 +58,7 @@ export type PickupReadyEmailData = Pick<
 
 /** Bildlänkar som läggs direkt i HTML-mailet. Det här är inte bilagor. */
 export type PickupReadyEmailVisualAssets = {
+  logoImageSrc?: string | null;
   mapImageSrc?: string | null;
   productImageSrcs?: Array<string | null>;
 };
@@ -136,10 +137,9 @@ export function buildPickupReadyHtml(
     )
     .join("");
 
-  const logoUrl = pickup.store.logoUrl?.trim() ?? "";
-  const canRenderLogo = logoUrl && !logoUrl.toLowerCase().includes(".svg");
-  const logoBlock = canRenderLogo
-    ? `<img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(pickup.store.name)}" width="160" style="display:block;max-width:160px;max-height:72px;width:auto;height:auto;margin:0 auto;" />`
+  const logoImageSrc = visualAssets?.logoImageSrc ?? null;
+  const logoBlock = logoImageSrc
+    ? `<img src="${escapeHtml(logoImageSrc)}" alt="${escapeHtml(pickup.store.name)}" width="160" style="display:block;max-width:160px;max-height:72px;width:auto;height:auto;margin:0 auto;" />`
     : `<p style="margin:0;font-size:20px;font-weight:800;color:#ffffff;letter-spacing:0.02em;">${escapeHtml(pickup.store.name)}</p>`;
 
   const mapSection = address

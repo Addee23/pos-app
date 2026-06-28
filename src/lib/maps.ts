@@ -132,7 +132,7 @@ export async function getStaticMapImageUrlForAddress(
     return null;
   }
 
-  return getOsmTileImageUrl(coords.lat, coords.lon, 15);
+  return getOsmStaticMapImageUrl(coords.lat, coords.lon, 15);
 }
 
 export async function getPickupMapImageUrl(

@@ -261,7 +261,12 @@ export function ProductSearch({
           {query ? (
             <button
               type="button"
-              onClick={() => setQuery("")}
+              onClick={() => {
+                setQuery("");
+                if (!submitOnButtonOnly && initialQuery) {
+                  navigate({ q: null });
+                }
+              }}
               aria-label="Rensa sökfält"
               className="absolute right-2.5 top-1/2 flex size-5 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-zinc-400 transition hover:bg-zinc-200/60 hover:text-zinc-600"
             >

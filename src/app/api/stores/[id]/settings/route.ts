@@ -63,10 +63,17 @@ export async function PATCH(request: Request, context: RouteContext) {
       ...settingsData
     } = parsed.data;
 
+    // Bara skicka fält som faktiskt ändrats.
+    const changedFields = Object.fromEntries(
+      Object.entries(settingsData).filter(
+        ([key, value]) => existing[key as keyof typeof existing] !== value,
+      ),
+    );
+
     const store = await prisma.store.update({
       where: { id },
       data: {
-        ...settingsData,
+        ...changedFields,
         ...(wooConsumerKey ? { wooConsumerKey: encryptSecret(wooConsumerKey) } : {}),
         ...(wooConsumerSecret
           ? { wooConsumerSecret: encryptSecret(wooConsumerSecret) }

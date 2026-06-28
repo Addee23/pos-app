@@ -143,7 +143,7 @@ function SearchHeader({
       <h2 className="mt-1 text-xl font-bold text-zinc-950">Sök produkter</h2>
       <p className="mt-2 text-sm leading-6 text-zinc-500">
         Skriv sökord och/eller välj filter, tryck sedan Sök för att visa
-        produkter.
+        produktinformation. För försäljning, använd Kassa.
       </p>
       <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
         <SummaryBox label="Träffar" value={String(productCount)} />
