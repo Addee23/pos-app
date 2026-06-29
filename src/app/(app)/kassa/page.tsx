@@ -47,7 +47,9 @@ export default async function KassaPage({ searchParams }: KassaPageProps) {
       );
     }
 
-    const resolvedStoreId = paramStoreId ?? allStores[0].id;
+    const adminOwnStoreId = session.user.storeId ?? undefined;
+    const defaultStoreId = adminOwnStoreId ?? allStores[0].id;
+    const resolvedStoreId = paramStoreId ?? defaultStoreId;
     const store = await prisma.store.findUnique({
       where: { id: resolvedStoreId },
       select: STORE_SELECT,

@@ -378,10 +378,22 @@ function SearchResultPopup({
   onAdd: (item: SearchItem) => void;
 }) {
   const groupedResults = groupSearchResults(results);
+  const singleGroup = groupedResults.length === 1 ? groupedResults[0] : null;
+
+  function handleSectionClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (singleGroup) {
+      const item = singleGroup.options[0];
+      if (item.stockQuantity > 0) onAdd(item);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-90 flex items-end justify-center bg-zinc-950/35 px-3 pb-3 pt-10 lg:items-center lg:p-6" onClick={onClose}>
-      <section className="max-h-[88vh] w-full max-w-107.5 overflow-y-auto rounded-4xl bg-[#f3eee5] p-4 shadow-2xl lg:max-w-xl" onClick={(e) => e.stopPropagation()}>
+      <section
+        className={`max-h-[88vh] w-full max-w-107.5 overflow-y-auto rounded-4xl bg-[#f3eee5] p-4 shadow-2xl lg:max-w-xl ${singleGroup ? "cursor-pointer" : ""}`}
+        onClick={handleSectionClick}
+      >
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-orange-600">
@@ -393,7 +405,7 @@ function SearchResultPopup({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={(e) => { e.stopPropagation(); onClose(); }}
             className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-white/80 text-sm font-bold text-zinc-500"
             aria-label="Stäng sökresultat"
           >
@@ -439,12 +451,12 @@ function SearchProductCard({
 
   return (
     <article
-      className={`flex w-[calc(50%-6px)] flex-col overflow-hidden rounded-2xl shadow-sm transition-transform active:scale-95 ${
+      className={`group flex w-[calc(50%-6px)] flex-col overflow-hidden rounded-2xl shadow-sm transition-transform active:scale-95 ${
         outOfStock
           ? "border border-red-200 bg-red-50"
-          : "cursor-pointer border border-[#dfd4c6] bg-[#f8f4ed] hover:border-orange-300"
+          : "cursor-pointer border border-[#dfd4c6] bg-[#f8f4ed] hover:border-orange-300 hover:shadow-md"
       }`}
-      onClick={() => { if (!outOfStock) onAdd(selectedItem); }}
+      onClick={(e) => { e.stopPropagation(); if (!outOfStock) onAdd(selectedItem); }}
     >
       <ProductImageSquare
         imageUrl={selectedItem.imageUrl ?? group.imageUrl}
@@ -484,10 +496,10 @@ function SearchProductCard({
         </div>
       ) : null}
 
-      <div className="px-2.5 pb-2.5" onClick={(e) => e.stopPropagation()}>
+      <div className="px-2.5 pb-2.5">
         <button
           type="button"
-          onClick={() => { if (!outOfStock) onAdd(selectedItem); }}
+          onClick={(e) => { e.stopPropagation(); if (!outOfStock) onAdd(selectedItem); }}
           disabled={outOfStock}
           className="min-h-10 w-full cursor-pointer rounded-xl bg-orange-500 px-4 text-xs font-bold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -507,7 +519,7 @@ function ProductImageSquare({
   name: string;
   dimmed?: boolean;
 }) {
-  const base = `aspect-square w-full bg-contain bg-center bg-no-repeat transition-opacity ${dimmed ? "opacity-40" : ""}`;
+  const base = `h-36 w-full bg-contain bg-center bg-no-repeat transition-opacity ${dimmed ? "opacity-40" : ""}`;
 
   if (!imageUrl) {
     return (

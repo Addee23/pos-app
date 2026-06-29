@@ -555,7 +555,7 @@ function PickupPopup({
           </div>
         </div>
 
-        <div className="mt-4 flex flex-col gap-3">
+        <div className="mt-4 flex flex-col gap-3 print:hidden">
           {pickups.map((pickup) => (
             <PickupInfoCard
               key={pickup.id}
@@ -568,6 +568,59 @@ function PickupPopup({
           ))}
         </div>
       </section>
+
+      {/* Ren utskriftslayout — visas bara vid print */}
+      <div id="plocklista-print-area" className="hidden print:block">
+        {pickups.map((pickup) => (
+          <div key={pickup.id} className="mb-8">
+            <div className="mb-4 border-b-2 border-black pb-2">
+              <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Plocklista</p>
+              <h1 className="text-2xl font-bold">{pickup.customerName}</h1>
+              <p className="text-base font-semibold">{pickup.pickupCode}</p>
+              <p className="text-sm text-zinc-500">{formatDate(pickup.createdAt)}</p>
+            </div>
+
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-zinc-300">
+                  <th className="w-6 py-2 text-left">☐</th>
+                  <th className="py-2 text-left font-bold">Produkt</th>
+                  <th className="py-2 text-center font-bold">Antal</th>
+                  <th className="py-2 text-left font-bold">Hylla</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pickup.items.map((item) => (
+                  <tr key={item.id} className="border-b border-zinc-200">
+                    <td className="py-2 text-lg">☐</td>
+                    <td className="py-2 font-medium">{itemLabel(item)}</td>
+                    <td className="py-2 text-center font-bold">{item.quantity}</td>
+                    <td className="py-2">{item.stockLocation ?? "–"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {pickup.notes ? (
+              <div className="mt-4 border border-zinc-300 p-3">
+                <p className="text-xs font-bold uppercase text-zinc-500">Notering</p>
+                <p className="mt-1 text-sm">{pickup.notes}</p>
+              </div>
+            ) : null}
+
+            <div className="mt-6 flex gap-8 text-sm">
+              <div>
+                <p className="text-xs font-bold uppercase text-zinc-500">Kundmail</p>
+                <p>{pickup.customerEmail ?? "Saknas"}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase text-zinc-500">Signatur</p>
+                <p className="mt-4 border-b border-zinc-400 w-40">&nbsp;</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -637,7 +690,7 @@ function PickupCard({
               onChange={() => onPack(pickup.id)}
               className="size-4 cursor-pointer accent-orange-500"
             />
-            {isSaving ? "Sparar..." : "Markera plockad"}
+            {isSaving ? "Sparar..." : "Markera packad"}
           </label>
         ) : (
           <button
