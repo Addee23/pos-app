@@ -99,7 +99,37 @@ export default async function AdminProductsPage({
         stores={stores}
         defaultStoreId={storeId ?? defaultStoreId}
       />
-      <ProductList products={products} />
+      <ProductList products={products.map((p) => ({
+        id: p.id,
+        wooProductId: p.wooProductId,
+        name: p.name,
+        slug: p.slug,
+        permalink: p.permalink,
+        productType: p.productType,
+        price: p.price.toString(),
+        ean: p.ean,
+        imageUrl: p.imageUrl,
+        metaDescription: p.metaDescription,
+        shortDescription: p.shortDescription,
+        category: p.category,
+        brand: p.brand,
+        country: p.country,
+        stockQuantity: p.stockQuantity,
+        stockLocation: p.stockLocation,
+        store: p.store,
+        variants: p.variants.map((v) => ({
+          id: v.id,
+          wooVariantId: v.wooVariantId,
+          name: v.name,
+          price: v.price.toString(),
+          ean: v.ean,
+          imageUrl: v.imageUrl,
+          metaDescription: v.metaDescription,
+          shortDescription: v.shortDescription,
+          stockQuantity: v.stockQuantity,
+          stockLocation: v.stockLocation,
+        })),
+      }))} />
       <ProductPagination
         currentPage={currentPage}
         pageSize={PRODUCTS_PER_PAGE}

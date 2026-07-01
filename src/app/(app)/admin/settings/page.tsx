@@ -44,7 +44,7 @@ export default async function AdminSettingsPage({
     );
   }
 
-  const selectedStoreId = storeId ?? stores[0].id;
+  const selectedStoreId = storeId ?? session.user.storeId ?? stores[0].id;
   const store = await prisma.store.findUnique({
     where: { id: selectedStoreId },
     select: {
@@ -103,13 +103,10 @@ export default async function AdminSettingsPage({
           Admin
         </p>
         <h2 className="mt-1 text-xl font-semibold text-zinc-900">Inställningar</h2>
-        <p className="mt-2 text-sm leading-6 text-zinc-500">
-          Välj butik och öppna rätt sektion i menyn — Butik, WooCommerce, E-post
-          eller Kvitto.
-        </p>
       </div>
 
       <StoreSettingsForm
+        key={store.id}
         stores={stores}
         store={store}
         wooSecretPreviews={{

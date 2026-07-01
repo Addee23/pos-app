@@ -83,6 +83,52 @@ export async function loadWooVariations(
   return Array.isArray(data) ? data : [];
 }
 
+export async function updateWooProductStock(
+  store: StoreWooCredentials,
+  wooProductId: number,
+  stockQuantity: number,
+): Promise<void> {
+  await wooApiPut(store, `/products/${wooProductId}`, {
+    stock_quantity: stockQuantity,
+    manage_stock: true,
+  });
+}
+
+export async function updateWooVariantStock(
+  store: StoreWooCredentials,
+  wooProductId: number,
+  wooVariantId: number,
+  stockQuantity: number,
+): Promise<void> {
+  await wooApiPut(store, `/products/${wooProductId}/variations/${wooVariantId}`, {
+    stock_quantity: stockQuantity,
+    manage_stock: true,
+  });
+}
+
+async function wooApiPut(
+  store: StoreWooCredentials,
+  path: string,
+  body: Record<string, unknown>,
+): Promise<unknown> {
+  const url = buildWooApiUrl(store, path, {});
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      `WooCommerce svarade ${response.status} vid lageruppdatering${text ? `: ${text.slice(0, 200)}` : ""}`,
+    );
+  }
+
+  return response.json();
+}
+
 async function wooApiGet(
   store: StoreWooCredentials,
   path: string,

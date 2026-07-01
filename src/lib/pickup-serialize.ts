@@ -20,6 +20,8 @@ type PickupWithRelations = {
     productSlug: string | null;
     productImageUrl: string | null;
     quantity: number;
+    variant: { stockLocation: string | null } | null;
+    product: { stockLocation: string | null } | null;
   }>;
 };
 
@@ -38,7 +40,15 @@ export type SerializedPickup = {
   packedBy: { name: string; email: string } | null;
   pickedUpBy: { name: string; email: string } | null;
   cancelledBy: { name: string; email: string } | null;
-  items: PickupWithRelations["items"];
+  items: Array<{
+    id: string;
+    productName: string;
+    variantName: string | null;
+    productSlug: string | null;
+    productImageUrl: string | null;
+    quantity: number;
+    stockLocation: string | null;
+  }>;
 };
 
 export function serializePickup(pickup: PickupWithRelations): SerializedPickup {
@@ -57,7 +67,15 @@ export function serializePickup(pickup: PickupWithRelations): SerializedPickup {
     packedBy: pickup.packedBy,
     pickedUpBy: pickup.pickedUpBy,
     cancelledBy: pickup.cancelledBy,
-    items: pickup.items,
+    items: pickup.items.map((item) => ({
+      id: item.id,
+      productName: item.productName,
+      variantName: item.variantName,
+      productSlug: item.productSlug,
+      productImageUrl: item.productImageUrl,
+      quantity: item.quantity,
+      stockLocation: item.variant?.stockLocation ?? item.product?.stockLocation ?? null,
+    })),
   };
 }
 
@@ -74,6 +92,8 @@ export const pickupResponseInclude = {
       productSlug: true,
       productImageUrl: true,
       quantity: true,
+      variant: { select: { stockLocation: true } },
+      product: { select: { stockLocation: true } },
     },
   },
 } as const;

@@ -53,6 +53,7 @@ model Store {
   thankYouMessage String?
   socialLinks     String?
   receiptWidthMm  Int      @default(80)
+  metaLabels      Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

@@ -165,4 +165,19 @@ textarea {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+
+  #plocklista-print-area,
+  #plocklista-print-area * {
+    visibility: visible;
+  }
+
+  #plocklista-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    color: #000000 !important;
+    background: #ffffff !important;
+    font-family: Arial, Helvetica, sans-serif;
+  }
 }

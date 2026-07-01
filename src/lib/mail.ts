@@ -127,10 +127,10 @@ export async function sendPickupReadyEmail(
     },
   };
 
+  const appBaseUrl = getAppBaseUrl();
   const rawMapImageSrc = await getStaticMapImageUrlForAddress(
     pickupForSend.store.address!,
   );
-  const mapImageSrc = toEmailSafeImageUrl(rawMapImageSrc);
 
   await transporter.sendMail({
     from: config.from,
@@ -138,9 +138,14 @@ export async function sendPickupReadyEmail(
     subject: buildPickupReadySubject(pickupForSend),
     text: buildPickupReadyText(pickupForSend),
     html: buildPickupReadyHtml(pickupForSend, {
-      mapImageSrc,
+      logoImageSrc: toEmailSafeImageUrl(
+        resolveAbsoluteImageUrl(pickupForSend.store.logoUrl, appBaseUrl),
+      ),
+      mapImageSrc: toEmailSafeImageUrl(rawMapImageSrc),
       productImageSrcs: pickupForSend.items.map((item) =>
-        toEmailSafeImageUrl(item.productImageUrl),
+        toEmailSafeImageUrl(
+          resolveAbsoluteImageUrl(item.productImageUrl, appBaseUrl),
+        ),
       ),
     }),
   });
@@ -178,6 +183,30 @@ export async function sendTestEmail(config: SmtpConfig, recipient: string) {
     },
     config,
   );
+}
+
+function getAppBaseUrl(): string {
+  return (process.env.NEXTAUTH_URL ?? "http://localhost:3000").replace(/\/$/, "");
+}
+
+function resolveAbsoluteImageUrl(
+  url: string | null | undefined,
+  appBaseUrl: string,
+): string | null {
+  const trimmed = url?.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith("/")) {
+    return `${appBaseUrl}${trimmed}`;
+  }
+
+  return `${appBaseUrl}/${trimmed.replace(/^\/+/, "")}`;
 }
 
 function toEmailSafeImageUrl(url: string | null | undefined): string | null {
