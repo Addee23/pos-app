@@ -28,7 +28,6 @@ export const authConfig = {
     jwt: async ({ token, user }) => {
       if (user) {
         token.role = user.role;
-        token.storeId = user.storeId;
       }
       return token;
     },
@@ -36,7 +35,6 @@ export const authConfig = {
       if (session.user && token.sub) {
         session.user.id = token.sub;
         session.user.role = token.role as Role;
-        session.user.storeId = token.storeId as string | null;
       }
       return session;
     },

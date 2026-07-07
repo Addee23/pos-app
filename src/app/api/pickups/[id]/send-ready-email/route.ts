@@ -44,10 +44,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   }
 
   const pickup = await prisma.pickup.findFirst({
-    where: {
-      id,
-      ...(session.user.storeId ? { storeId: session.user.storeId } : {}),
-    },
+    where: { id },
     select: { id: true },
   });
 

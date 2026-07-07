@@ -39,32 +39,17 @@ export async function POST(request: Request) {
     );
   }
 
-  // Bestäm butik: admin använder storeId från body, personal hämtar från DB.
-  const isAdmin = session.user.role === "ADMIN";
-  let storeId: string;
-
-  if (isAdmin) {
-    if (!parsed.data.storeId) {
-      return NextResponse.json({ error: "Ange storeId" }, { status: 400 });
-    }
-    const storeExists = await prisma.store.findUnique({
-      where: { id: parsed.data.storeId },
-      select: { id: true },
-    });
-    if (!storeExists) {
-      return NextResponse.json({ error: "Butiken hittades inte" }, { status: 404 });
-    }
-    storeId = parsed.data.storeId;
-  } else {
-    const freshUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { storeId: true },
-    });
-    if (!freshUser?.storeId) {
-      return NextResponse.json({ error: "Användaren saknar butik" }, { status: 400 });
-    }
-    storeId = freshUser.storeId;
+  if (!parsed.data.storeId) {
+    return NextResponse.json({ error: "Ange storeId" }, { status: 400 });
   }
+  const storeExists = await prisma.store.findUnique({
+    where: { id: parsed.data.storeId },
+    select: { id: true },
+  });
+  if (!storeExists) {
+    return NextResponse.json({ error: "Butiken hittades inte" }, { status: 404 });
+  }
+  const storeId = parsed.data.storeId;
 
   type SaleLineItem = {
     productId: string;

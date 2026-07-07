@@ -16,10 +16,11 @@ export type PickupDashboardPayload = {
 };
 
 export async function loadPickupDashboard(
-  storeId: string,
+  storeIds: string[] | null,
 ): Promise<PickupDashboardPayload> {
-  const awaitingWhere = { storeId, status: PickupStatus.AWAITING_PACK };
-  const readyWhere = { storeId, status: PickupStatus.READY };
+  const storeFilter = storeIds === null ? {} : { storeId: { in: storeIds } };
+  const awaitingWhere = { ...storeFilter, status: PickupStatus.AWAITING_PACK };
+  const readyWhere = { ...storeFilter, status: PickupStatus.READY };
 
   const [needsHandlingRows, readyForPickupRows, needsHandlingCount, readyForPickupCount] =
     await Promise.all([

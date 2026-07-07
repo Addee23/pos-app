@@ -3,7 +3,6 @@ import {
   collectAvailableMetaKeys,
   extractStoredMetaGroupValues,
   readStoredMetaField,
-  WOO_PRODUCT_META_KEYS,
 } from "@/lib/woo-product-metadata";
 
 type WooObject = Record<string, unknown>;
@@ -27,11 +26,6 @@ export type StoredProductMetaSource = {
   shortDescription: string | null;
   wooMetadata: unknown;
 };
-
-export const WOO_META_FIELD_SUGGESTIONS = WOO_PRODUCT_META_KEYS.map((key) => ({
-  input: key,
-  label: key,
-}));
 
 export { collectAvailableMetaKeys };
 

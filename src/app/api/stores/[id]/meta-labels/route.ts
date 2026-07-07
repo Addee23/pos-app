@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { isAdmin } from "../../../../../../rbac";
 import { rateLimit } from "@/lib/rate-limit";
-import { collectAvailableMetaKeys, WOO_PRODUCT_META_KEYS } from "@/lib/woo-product-metadata";
 import { z } from "zod";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -15,7 +14,6 @@ export async function GET(_request: Request, context: RouteContext) {
   if (!isAdmin(session.user.role)) return NextResponse.json({ error: "Åtkomst nekad" }, { status: 403 });
 
   const { id } = await context.params;
-  console.log("[meta-labels GET] storeId:", id, "user:", session.user.email);
 
   try {
     const store = await prisma.store.findUnique({
@@ -24,23 +22,8 @@ export async function GET(_request: Request, context: RouteContext) {
     });
     if (!store) return NextResponse.json({ error: "Butiken hittades inte" }, { status: 404 });
 
-    const products = await prisma.product.findMany({
-      where: { storeId: id },
-      select: { wooMetadata: true },
-    });
-
-    const dbKeys = collectAvailableMetaKeys(products);
-    const baseKeys = dbKeys.length > 0
-      ? dbKeys
-      : [...WOO_PRODUCT_META_KEYS];
-    // Lägg alltid till "brand" — det är ett eget DB-fält, inte ett meta-fält
-    const availableKeys = [...new Set(["brand", ...baseKeys])].sort((a, b) =>
-      a.localeCompare(b, "sv"),
-    );
-
-    const savedLabels = (store.metaLabels ?? {}) as Record<string, string>;
-
-    return NextResponse.json({ availableKeys, labels: savedLabels });
+    const labels = (store.metaLabels ?? {}) as Record<string, string>;
+    return NextResponse.json({ labels });
   } catch (err) {
     console.error("[meta-labels GET]", err);
     const detail = err instanceof Error ? err.message : String(err);

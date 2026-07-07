@@ -21,37 +21,49 @@ async function main() {
     process.exit(1);
   }
 
-  const product = await prisma.product.findFirst({
-    where: { storeId: store.id },
-    include: { variants: true },
+  const products = await prisma.product.findMany({
+    where: { storeId: store.id, stockQuantity: { gt: 0 } },
+    include: { variants: { where: { stockQuantity: { gt: 0 } } } },
+    take: 3,
   });
+
+  if (products.length === 0) {
+    console.error("Inga produkter i lager hittades.");
+    process.exit(1);
+  }
+
+  const itemsToCreate = products.map((p) => {
+    const variant = p.variants[0] ?? null;
+    return {
+      productName: p.name,
+      variantName: variant?.name ?? null,
+      productSlug: p.slug,
+      productImageUrl: variant?.imageUrl ?? p.imageUrl,
+      quantity: 1,
+      productId: p.id,
+      variantId: variant?.id ?? null,
+    };
+  });
+
+  const code = "HAMTA-" + Date.now().toString().slice(-5);
 
   const pickup = await prisma.pickup.create({
     data: {
       storeId: store.id,
-      customerName: "Test Kund",
-      customerEmail: "test@example.com",
-      pickupCode: "HAMTA-TEST-" + Date.now().toString().slice(-4),
+      customerName: "Anna Svensson",
+      customerEmail: "anna.svensson@example.com",
+      pickupCode: code,
       status: "AWAITING_PACK",
-      items: product
-        ? {
-            create: [
-              {
-                productName: product.name,
-                variantName: product.variants[0]?.name ?? null,
-                productSlug: product.slug,
-                productImageUrl: product.variants[0]?.imageUrl ?? product.imageUrl,
-                quantity: 1,
-                productId: product.id,
-                variantId: product.variants[0]?.id ?? null,
-              },
-            ],
-          }
-        : undefined,
+      notes: "Kunden hämtar efter lunch, ring om något saknas.",
+      items: { create: itemsToCreate },
     },
   });
 
-  console.log("Testorder skapad:", pickup.id, pickup.pickupCode, pickup.status);
+  console.log("\n✓ Testorder skapad!");
+  console.log("  Kund:     ", pickup.customerName);
+  console.log("  Kod:      ", pickup.pickupCode);
+  console.log("  Status:   ", pickup.status);
+  console.log("  Produkter:", itemsToCreate.map((i) => i.productName).join(", "));
 }
 
 main()

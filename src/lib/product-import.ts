@@ -44,15 +44,27 @@ export async function importWooProductsForStore(
   prisma: PrismaClient,
   store: StoreForImport,
   rawProducts: unknown[],
-  options: { updateOnly?: boolean } = {},
+  options: { updateOnly?: boolean; onProgress?: (processed: number, total: number) => void } = {},
 ): Promise<ImportProductsResult> {
   const updateOnly = options.updateOnly === true;
+
+  const storeConfig = await prisma.store.findUnique({
+    where: { id: store.id },
+    select: { metaLabels: true },
+  });
+  const allowedMetaKeys =
+    storeConfig?.metaLabels &&
+    typeof storeConfig.metaLabels === "object" &&
+    !Array.isArray(storeConfig.metaLabels)
+      ? Object.keys(storeConfig.metaLabels as Record<string, string>)
+      : undefined;
 
   const products = await normalizeWooProducts({
     products: rawProducts,
     loadVariations: canLoadWooVariations(store)
       ? (productId) => loadWooVariations(store, productId)
       : undefined,
+    allowedMetaKeys,
   });
 
   const result: ImportProductsResult = {
@@ -67,6 +79,9 @@ export async function importWooProductsForStore(
     importedProducts: 0,
     importedVariants: 0,
   };
+
+  let processed = 0;
+  const total = products.length;
 
   for (const product of products) {
     const existing = await prisma.product.findUnique({
@@ -116,6 +131,9 @@ export async function importWooProductsForStore(
     result.updatedVariants += variantResult.updated;
     result.unchangedVariants += variantResult.unchanged;
     result.importedVariants += variantResult.created + variantResult.updated;
+
+    processed++;
+    options.onProgress?.(processed, total);
   }
 
   return result;

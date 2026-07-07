@@ -23,13 +23,6 @@ export async function PATCH(_request: Request, { params }: RouteParams) {
     );
   }
 
-  if (!isAdmin(session.user.role) && !session.user.storeId) {
-    return NextResponse.json(
-      { error: "Användaren saknar butik" },
-      { status: 400 },
-    );
-  }
-
   const cancelLimit = rateLimit({
     key: `pickup-cancel:${session.user.id}`,
     limit: 20,
@@ -44,12 +37,7 @@ export async function PATCH(_request: Request, { params }: RouteParams) {
 
   try {
     const pickup = await prisma.pickup.findFirst({
-      where: {
-        id,
-        ...(isAdmin(session.user.role)
-          ? {}
-          : { storeId: session.user.storeId! }),
-      },
+      where: { id },
     });
 
     if (!pickup) {

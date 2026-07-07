@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import {
@@ -8,6 +7,7 @@ import {
 } from "@/lib/product-import";
 import { isAdmin } from "../../../../../../../rbac";
 import { rateLimit } from "@/lib/rate-limit";
+import { NextResponse } from "next/server";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -18,7 +18,6 @@ export async function POST(_request: Request, context: RouteContext) {
   if (!session?.user) {
     return NextResponse.json({ error: "Ej inloggad" }, { status: 401 });
   }
-
   if (!isAdmin(session.user.role)) {
     return NextResponse.json({ error: "Åtkomst nekad" }, { status: 403 });
   }
@@ -28,12 +27,9 @@ export async function POST(_request: Request, context: RouteContext) {
     limit: 5,
     windowMs: 60 * 1000,
   });
-
   if (!syncLimit.allowed) {
     return NextResponse.json(
-      {
-        error: `För många synkroniseringar. Vänta ${syncLimit.retryAfterSeconds} sekunder.`,
-      },
+      { error: `För många synkroniseringar. Vänta ${syncLimit.retryAfterSeconds} sekunder.` },
       { status: 429 },
     );
   }
@@ -41,42 +37,45 @@ export async function POST(_request: Request, context: RouteContext) {
   const { id: storeId } = await context.params;
   const store = await prisma.store.findUnique({
     where: { id: storeId },
-    select: {
-      id: true,
-      wooUrl: true,
-      wooConsumerKey: true,
-      wooConsumerSecret: true,
-    },
+    select: { id: true, wooUrl: true, wooConsumerKey: true, wooConsumerSecret: true },
   });
-
   if (!store) {
     return NextResponse.json({ error: "Butiken finns inte" }, { status: 404 });
   }
-
   if (!hasWooCredentials(store)) {
     return NextResponse.json(
-      {
-        error:
-          "WooCommerce saknas för butiken. Fyll i URL och API-nycklar under Admin → Inställningar.",
-      },
+      { error: "WooCommerce saknas för butiken. Fyll i URL och API-nycklar under Inställningar." },
       { status: 400 },
     );
   }
 
-  try {
-    const rawProducts = await fetchAllWooProducts(store);
-    const result = await importWooProductsForStore(prisma, store, rawProducts);
+  const encoder = new TextEncoder();
+  const send = (data: object) => encoder.encode(JSON.stringify(data) + "\n");
 
-    return NextResponse.json({
-      ...result,
-      fetchedFromWoo: rawProducts.length,
-    });
-  } catch (error) {
-    console.error(error);
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Kunde inte uppdatera produkter från WooCommerce";
-    return NextResponse.json({ error: message }, { status: 502 });
-  }
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        const rawProducts = await fetchAllWooProducts(store);
+        controller.enqueue(send({ type: "total", count: rawProducts.length }));
+
+        const result = await importWooProductsForStore(prisma, store, rawProducts, {
+          onProgress: (processed, total) => {
+            controller.enqueue(send({ type: "progress", processed, total }));
+          },
+        });
+
+        controller.enqueue(send({ type: "done", result, fetchedFromWoo: rawProducts.length }));
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Kunde inte uppdatera produkter från WooCommerce";
+        controller.enqueue(send({ type: "error", message }));
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: { "Content-Type": "application/x-ndjson" },
+  });
 }

@@ -1,5 +1,6 @@
 type PickupWithRelations = {
   id: string;
+  storeId: string;
   customerName: string;
   customerEmail: string | null;
   pickupCode: string;
@@ -27,6 +28,7 @@ type PickupWithRelations = {
 
 export type SerializedPickup = {
   id: string;
+  storeId: string;
   customerName: string;
   customerEmail: string | null;
   pickupCode: string;
@@ -54,6 +56,7 @@ export type SerializedPickup = {
 export function serializePickup(pickup: PickupWithRelations): SerializedPickup {
   return {
     id: pickup.id,
+    storeId: pickup.storeId,
     customerName: pickup.customerName,
     customerEmail: pickup.customerEmail,
     pickupCode: pickup.pickupCode,

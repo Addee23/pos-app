@@ -51,13 +51,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
-    const [existingUser, store] = await Promise.all([
-      prisma.user.findUnique({ where: { id }, select: { id: true } }),
-      prisma.store.findUnique({
-        where: { id: parsed.data.storeId },
-        select: { id: true },
-      }),
-    ]);
+    const existingUser = await prisma.user.findUnique({ where: { id }, select: { id: true } });
 
     if (!existingUser) {
       return NextResponse.json(
@@ -66,25 +60,18 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    if (!store) {
-      return NextResponse.json({ error: "Butiken hittades inte" }, { status: 404 });
-    }
-
     const user = await prisma.user.update({
       where: { id },
       data: {
         name: parsed.data.name,
         role: parsed.data.role,
-        storeId: parsed.data.storeId,
       },
       select: {
         id: true,
         email: true,
         name: true,
         role: true,
-        storeId: true,
         createdAt: true,
-        store: { select: { id: true, name: true } },
       },
     });
 

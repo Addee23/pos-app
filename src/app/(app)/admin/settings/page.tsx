@@ -44,7 +44,7 @@ export default async function AdminSettingsPage({
     );
   }
 
-  const selectedStoreId = storeId ?? session.user.storeId ?? stores[0].id;
+  const selectedStoreId = storeId ?? stores[0].id;
   const store = await prisma.store.findUnique({
     where: { id: selectedStoreId },
     select: {

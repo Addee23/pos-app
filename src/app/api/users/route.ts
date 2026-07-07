@@ -22,9 +22,7 @@ export async function GET() {
       email: true,
       name: true,
       role: true,
-      storeId: true,
       createdAt: true,
-      store: { select: { id: true, name: true } },
     },
     orderBy: [{ role: "asc" }, { name: "asc" }],
   });
@@ -66,15 +64,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    const store = await prisma.store.findUnique({
-      where: { id: parsed.data.storeId },
-      select: { id: true },
-    });
-
-    if (!store) {
-      return NextResponse.json({ error: "Butiken hittades inte" }, { status: 404 });
-    }
-
     const existingUser = await prisma.user.findUnique({
       where: { email: parsed.data.email },
       select: { id: true },
@@ -94,16 +83,13 @@ export async function POST(request: Request) {
         name: parsed.data.name,
         passwordHash,
         role: parsed.data.role,
-        storeId: parsed.data.storeId,
       },
       select: {
         id: true,
         email: true,
         name: true,
         role: true,
-        storeId: true,
         createdAt: true,
-        store: { select: { id: true, name: true } },
       },
     });
 
