@@ -1,62 +1,64 @@
 # POS & Lagerhanteringssystem
 
-Internt POS- och lagerhanteringssystem (mobile-first) enligt LIA-projektbeskrivningen.
+Internt POS- och lagerhanteringssystem (mobile-first PWA) kopplat till WooCommerce, byggt som LIA-projekt.
 
-## Vecka 1 – vad som är klart
+## Vad systemet gör
 
-- Inloggning med **Auth.js (NextAuth)**
-- Roller: **ADMIN** och **PERSONAL** (RBAC i middleware + API)
-- Krypterade lösenord med **bcrypt**
-- **Produkthantering** för admin (sök, filtrera per butik, redigera pris/EAN/lager/lagerplats)
-- **Audit logs** vid produktändringar
-- **Zod**-validering på API
+- **Kassa (POS)** — sök/skanna produkter via namn, EAN eller WooCommerce-URL, lägg till i varukorg, slutför köp, skriv ut kvitto. Lokalt lagersaldo minskas och synkas till WooCommerce.
+- **Produktsök** — sök bland alla produkter med filter (kategori, varumärke, land, butik). Klicka på kort för att lägga till i varukorg direkt.
+- **Upphämtningar** — hämtar WooCommerce-orders med status `processing`. Personal packar ordern, prickar av varor, skriver ut plocklista och markerar som packad (mail skickas till kund). Sedan markeras ordern som hämtad.
+- **Produkthantering (admin)** — sök, filtrera per butik, redigera pris/EAN/lager/lagerplats per produkt och variant. Synka produkter från WooCommerce med realtids-progress.
+- **Inställningar (admin)** — per-butik WooCommerce-koppling (URL + API-nycklar, krypterade), kvittoinställningar, mailkonfiguration, dynamiska meta-nycklar.
+- **Användarhantering (admin)** — skapa/redigera användare, filtrera på roll, sök.
+- **Dashboard (admin)** — sync-status, senaste aktiviteter, statistik.
+- **Audit logs** — alla produktändringar loggas med användare, butik och gamla/nya värden.
 
 ## Teknik
 
-- Next.js 16 + TypeScript
-- Prisma ORM + MySQL
-- Tailwind CSS
-- Auth.js v5
+- **Next.js 16** (App Router, Turbopack)
+- **TypeScript** (strict)
+- **Prisma ORM** + MariaDB
+- **Tailwind CSS**
+- **Auth.js v5** (HTTP-only cookies, bcrypt, RBAC)
+- **Zod** — validering på alla API-routes
+- **PWA** — installerbar på mobil, manifest konfigurerat
 
-## Kom igång (steg för steg)
+## Roller
 
-### 1. Installera MySQL
+| Roll | Åtkomst |
+|------|---------|
+| ADMIN | Allt — dashboard, produkter, inställningar, användare, logs |
+| PERSONAL | Kassa, sök, upphämtningar |
 
-**Alternativ A – Docker (rekommenderat om du har Docker Desktop):**
+## Kom igång
+
+### 1. Databas
+
+Projektet använder MariaDB på port **3307**. Starta med Docker:
 
 ```powershell
-cd c:\Users\adiii\OneDrive\Documents\LIA2\pos-app
 docker compose up -d
 ```
 
-**Alternativ B – XAMPP (om du inte har Docker):**
+### 2. Miljövariabler
 
-1. Ladda ner [XAMPP](https://www.apachefriends.org/) och starta **MySQL**
-2. Öppna phpMyAdmin (`http://localhost/phpmyadmin`)
-3. Skapa databasen `pos_app`
-4. Skapa användare `pos` med lösenord `pos_password` och ge åtkomst till `pos_app`
-5. Uppdatera `.env` om du använder andra uppgifter
+Kopiera `.env.example` till `.env`:
 
-Vänta tills MySQL körs innan du går vidare.
-
-### 3. Miljövariabler
-
-Kopiera `.env.example` till `.env` (redan skapad vid utveckling):
-
-```
-DATABASE_URL="mysql://pos:pos_password@localhost:3306/pos_app"
+```env
+DATABASE_URL="mysql://pos:pos_password@localhost:3307/pos_app"
 AUTH_SECRET="din-hemliga-nyckel-minst-32-tecken"
 NEXTAUTH_URL="http://localhost:3000"
+ENCRYPTION_KEY="32-tecken-hex-nyckel-för-woo-nycklar"
 ```
 
-### 4. Databasmigrering och testdata
+### 3. Databas + testdata
 
 ```powershell
 npm run db:migrate
 npm run db:seed
 ```
 
-### 5. Starta appen
+### 4. Starta
 
 ```powershell
 npm run dev
@@ -66,41 +68,57 @@ npm run dev
 
 ### Testkonton
 
-| Roll     | E-post              | Lösenord     |
-|----------|---------------------|--------------|
-| Admin    | admin@butik.se      | admin123     |
-| Personal | personal@butik.se   | personal123  |
+| Roll | E-post | Lösenord |
+|------|--------|----------|
+| Admin | admin@butik.se | admin123 |
+| Personal | personal@butik.se | personal123 |
 
 ## Projektstruktur
 
 ```
 src/
   app/
-    login/          # Inloggning
-    (app)/          # Skyddade sidor med navigation
-      kassa/
-      admin/products/
-  auth.ts           # Auth.js-konfiguration
-  middleware.ts     # RBAC & omdirigering
-  lib/              # Prisma, validering, audit
-  components/       # UI-komponenter
+    (app)/              # Skyddade sidor (kräver inloggning)
+      kassa/            # POS-kassa
+      sok/              # Produktsök med varukorg
+      upphamtning/      # Upphämtningar
+      admin/
+        dashboard/      # Sync-status och statistik
+        products/       # Produkthantering
+        users/          # Användarhantering
+        settings/       # Butiksinställningar
+        logs/           # Audit logs
+    api/                # API-routes (skyddade med auth + RBAC)
+    login/              # Inloggningssida
+  components/
+    pickups/            # Upphämtnings-UI
+    pos/                # Kassa-UI och kvitto
+    products/           # Produktlista och verktyg
+    search/             # Produktsök med varukorg
+    settings/           # Inställningsformulär
+    users/              # Användarhantering-UI
+    ui/                 # Delade UI-komponenter (toast, etc.)
+  lib/                  # Prisma, validering, WooCommerce-integrationer, mail
+  auth.ts               # Auth.js-konfiguration
+  middleware.ts         # RBAC och omdirigering
 prisma/
-  schema.prisma     # Datamodell
-  seed.ts           # Testdata
+  schema.prisma         # Datamodell
+  seed.ts               # Testdata
 ```
 
-## Nästa steg (vecka 2+)
+## Branch-struktur
 
-- Kassaflöde (skanning, kvitto)
-- WooCommerce webhook-sync
-- Upphämtningar
-- PWA + kamera
-- Dashboard med sync-status
-
-## Git
-
-```powershell
-git checkout -b dev
-git add .
-git commit -m "feat: login, roller och produkthantering"
 ```
+main        # Stabil kod
+features    # Pågående funktionsutveckling
+```
+
+## Säkerhet
+
+- Auth.js med secure HTTP-only session-cookies
+- Bcrypt lösenordshashning (12 rounds)
+- RBAC på middleware och alla API-routes
+- Rate limiting på känsliga endpoints
+- Zod-validering på all input
+- WooCommerce API-nycklar krypterade (AES-256-GCM) i databasen
+- Audit logs på alla produktändringar
