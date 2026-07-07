@@ -10,24 +10,16 @@ export default async function AdminUsersPage() {
     redirect("/kassa");
   }
 
-  const [users, stores] = await Promise.all([
-    prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        storeId: true,
-        createdAt: true,
-        store: { select: { id: true, name: true } },
-      },
-      orderBy: [{ role: "asc" }, { name: "asc" }],
-    }),
-    prisma.store.findMany({
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const users = await prisma.user.findMany({
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      createdAt: true,
+    },
+    orderBy: [{ role: "asc" }, { name: "asc" }],
+  });
 
   const adminCount = users.filter((user) => user.role === "ADMIN").length;
   const personalCount = users.filter((user) => user.role === "PERSONAL").length;
@@ -49,8 +41,8 @@ export default async function AdminUsersPage() {
               Användare
             </h2>
             <p className="mt-1.5 text-sm leading-6 text-zinc-500">
-              Skapa konton för personal och admin. Tilldela butik och roll —
-              lösenord hashas automatiskt vid skapande.
+              Skapa konton för personal och admin. Personal väljer själva butik
+              när de loggar in.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <StatPill label="Totalt" value={users.length} />
@@ -63,10 +55,12 @@ export default async function AdminUsersPage() {
 
       <UserManagementClient
         initialUsers={users.map((user) => ({
-          ...user,
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
           createdAt: user.createdAt.toISOString(),
         }))}
-        stores={stores}
         currentUserId={session.user.id}
       />
     </section>

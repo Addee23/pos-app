@@ -16,7 +16,7 @@ export default async function NewProductPage() {
     select: { id: true, name: true },
   });
 
-  const defaultStoreId = session.user.storeId ?? stores[0]?.id ?? "";
+  const defaultStoreId = stores[0]?.id ?? "";
 
   return (
     <section className="flex flex-col gap-4">

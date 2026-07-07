@@ -82,16 +82,9 @@ async function DashboardContent() {
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
-    session.user.storeId
-      ? prisma.store
-          .findUnique({
-            where: { id: session.user.storeId },
-            select: { name: true },
-          })
-          .then((store) => store?.name ?? null)
-      : prisma.store
-          .findFirst({ orderBy: { name: "asc" }, select: { name: true } })
-          .then((store) => store?.name ?? null),
+    prisma.store
+      .findFirst({ orderBy: { name: "asc" }, select: { name: true } })
+      .then((store) => store?.name ?? null),
     prisma.user.count(),
     prisma.user.count({ where: { role: "ADMIN" } }),
     prisma.user.count({ where: { role: "PERSONAL" } }),

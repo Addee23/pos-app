@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ProductActions } from "@/components/products/ProductActions";
 
 export type SerializedVariant = {
@@ -62,12 +62,12 @@ export function ProductList({ products }: ProductListProps) {
               key={product.id}
               className={`flex w-[calc(50%-6px)] flex-col overflow-hidden rounded-2xl shadow-sm transition-transform active:scale-95 ${
                 outOfStock
-                  ? "border border-red-200 bg-red-50"
+                  ? "cursor-pointer border border-red-200 bg-red-50 hover:shadow-md"
                   : "cursor-pointer border border-[#dfd4c6] bg-[#f8f4ed] hover:border-orange-300 hover:shadow-md"
               }`}
               onClick={() => setSelected(product)}
             >
-              <ProductCard product={product} outOfStock={outOfStock} />
+              <ProductCard product={product} />
               <div
                 className={`border-t px-2.5 pb-2.5 pt-2 ${outOfStock ? "border-red-200" : "border-[#dfd4c6]"}`}
                 onClick={(e) => e.stopPropagation()}
@@ -102,6 +102,12 @@ function ProductDetailModal({
   const outOfStock = isOutOfStock(product);
   const isVariable = product.productType === "VARIABLE";
   const inStockVariants = isVariable ? product.variants.filter((v) => v.stockQuantity > 0) : [];
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   return (
     <div
@@ -150,15 +156,14 @@ function ProductDetailModal({
         </div>
 
         <div className="mt-3 overflow-hidden rounded-xl border border-[#dfd4c6] text-xs">
-          <InfoRow label="EAN" value={product.ean ?? "-"} />
           <InfoRow label="Plats" value={product.stockLocation ?? "-"} />
           {product.category ? <InfoRow label="Kategori" value={product.category} /> : null}
           {product.brand ? <InfoRow label="Varumärke" value={product.brand} /> : null}
           {product.country ? <InfoRow label="Land" value={product.country} /> : null}
         </div>
 
-        {product.metaDescription ? (
-          <p className="mt-3 text-xs leading-5 text-[#6a5b50]">{product.metaDescription}</p>
+        {product.shortDescription ? (
+          <p className="mt-3 text-xs leading-5 text-[#6a5b50]">{product.shortDescription}</p>
         ) : null}
 
         {isVariable && product.variants.length > 0 ? (
@@ -199,22 +204,55 @@ function isOutOfStock(product: ProductWithRelations): boolean {
   return product.stockQuantity <= 0;
 }
 
-function ProductCard({
-  product,
-  outOfStock,
-}: {
-  product: ProductWithRelations;
-  outOfStock: boolean;
-}) {
+function ProductCard({ product }: { product: ProductWithRelations }) {
   const isVariable = product.productType === "VARIABLE";
-  const singleVariant = isVariable && product.variants.length === 1 ? product.variants[0] : null;
-  const inStockVariants = isVariable ? product.variants.filter((v) => v.stockQuantity > 0) : [];
+  const inStockVariants = isVariable
+    ? product.variants.filter((v) => v.stockQuantity > 0)
+    : [];
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
+    inStockVariants[0]?.id ?? null,
+  );
+  const [showDescription, setShowDescription] = useState(false);
 
-  const displayPrice = singleVariant ? singleVariant.price : product.price;
-  const displayStock = singleVariant ? singleVariant.stockQuantity : product.stockQuantity;
-  const displayEan = singleVariant ? singleVariant.ean : product.ean;
-  const displayLocation = singleVariant ? singleVariant.stockLocation : product.stockLocation;
-  const displayImage = singleVariant?.imageUrl ?? product.imageUrl;
+  const selectedVariant = selectedVariantId
+    ? (product.variants.find((v) => v.id === selectedVariantId) ?? null)
+    : null;
+
+  const displayPrice = selectedVariant ? selectedVariant.price : product.price;
+  const displayStock = selectedVariant
+    ? selectedVariant.stockQuantity
+    : product.stockQuantity;
+  const displayLocation = selectedVariant
+    ? selectedVariant.stockLocation
+    : product.stockLocation;
+  const displayImage = selectedVariant?.imageUrl ?? product.imageUrl;
+  const displayDescription =
+    selectedVariant?.shortDescription ?? product.shortDescription;
+  const outOfStock = isVariable
+    ? inStockVariants.length === 0
+    : product.stockQuantity <= 0;
+
+  if (showDescription) {
+    return (
+      <article
+        className="flex flex-1 flex-col p-2.5"
+        onClick={(e) => { e.stopPropagation(); setShowDescription(false); }}
+      >
+        <button
+          type="button"
+          className="mb-2 cursor-pointer text-left text-[10px] font-semibold text-orange-600 hover:text-orange-800"
+        >
+          ← Tillbaka
+        </button>
+        <p className="line-clamp-1 text-xs font-semibold leading-4 text-[#43342c]">
+          {product.name}
+        </p>
+        <p className="mt-2 text-xs leading-5 text-[#6a5b50]">
+          {displayDescription}
+        </p>
+      </article>
+    );
+  }
 
   return (
     <article className="flex flex-1 flex-col">
@@ -225,36 +263,61 @@ function ProductCard({
           {product.name}
         </p>
         <p className={`mt-0.5 text-[10px] font-semibold ${outOfStock ? "text-zinc-400" : "text-orange-700"}`}>
-          {singleVariant ? singleVariant.name : product.store.name}
+          {selectedVariant ? selectedVariant.name : product.store.name}
         </p>
         <p className={`mt-0.5 text-sm font-bold ${outOfStock ? "text-zinc-400" : "text-[#43342c]"}`}>
           {formatPrice(displayPrice)} kr
         </p>
-        {!(isVariable && !singleVariant) ? (
-          <p className={`mt-0.5 text-[10px] font-semibold ${outOfStock ? "text-red-400" : "text-zinc-400"}`}>
-            {outOfStock ? "Slut i lager" : `${displayStock} st i lager`}
-          </p>
-        ) : null}
+        <p className={`mt-0.5 text-[10px] font-semibold ${outOfStock ? "text-red-400" : "text-zinc-400"}`}>
+          {outOfStock ? "Slut i lager" : `${displayStock} st i lager`}
+        </p>
       </div>
 
       <div className={`mx-2.5 mb-2.5 overflow-hidden rounded-xl border text-xs ${outOfStock ? "border-red-200" : "border-[#dfd4c6]"}`}>
-        <InfoBox label="EAN" value={displayEan ?? "-"} outOfStock={outOfStock} />
         <InfoBox label="Plats" value={displayLocation ?? "-"} outOfStock={outOfStock} />
       </div>
 
-      {isVariable && !singleVariant ? (
-        <div className="flex flex-wrap gap-1 px-2.5 pb-2.5">
+      {displayDescription ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowDescription(true);
+          }}
+          className="mx-2.5 mb-2.5 cursor-pointer text-left text-[10px] font-semibold text-orange-600 hover:text-orange-800"
+        >
+          Läs beskrivning →
+        </button>
+      ) : null}
+
+      {isVariable ? (
+        <div
+          className="flex flex-wrap gap-1 px-2.5 pb-2.5"
+          onClick={(e) => e.stopPropagation()}
+        >
           {inStockVariants.length > 0 ? (
-            inStockVariants.map((v) => <Chip key={v.id} label={v.name} highlight />)
+            inStockVariants.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedVariantId(v.id);
+                }}
+                className={`max-w-full truncate rounded-full px-2 py-1 text-[10px] font-semibold transition ${
+                  v.id === selectedVariantId
+                    ? "bg-orange-500 text-white"
+                    : "bg-green-100 text-green-800 hover:bg-green-200"
+                }`}
+              >
+                {v.name}
+              </button>
+            ))
           ) : (
-            <Chip label="Alla varianter slut" dim />
+            <span className="rounded-full bg-red-100 px-2 py-1 text-[10px] font-semibold text-red-400">
+              Alla varianter slut
+            </span>
           )}
-        </div>
-      ) : product.category || product.brand || product.country ? (
-        <div className="flex flex-wrap gap-1 px-2.5 pb-2.5">
-          {product.category ? <Chip label={product.category} /> : null}
-          {product.brand ? <Chip label={product.brand} /> : null}
-          {product.country ? <Chip label={product.country} /> : null}
         </div>
       ) : null}
     </article>
@@ -316,29 +379,6 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Chip({
-  label,
-  highlight = false,
-  dim = false,
-}: {
-  label: string;
-  highlight?: boolean;
-  dim?: boolean;
-}) {
-  return (
-    <span
-      className={`max-w-full truncate rounded-full px-2 py-1 text-[10px] font-semibold ${
-        highlight
-          ? "bg-green-100 text-green-800"
-          : dim
-            ? "bg-red-100 text-red-400"
-            : "bg-white text-[#75675d]"
-      }`}
-    >
-      {label}
-    </span>
-  );
-}
 
 function formatPrice(value: string): string {
   return Number(value).toFixed(2);

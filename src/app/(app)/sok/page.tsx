@@ -47,12 +47,7 @@ export default async function SökPage({ searchParams }: SökPageProps) {
   const search = normalizeSearch(query);
   const isAdmin = session?.user.role === "ADMIN";
 
-  const storeFilter: Prisma.ProductWhereInput =
-    session?.user.role === "PERSONAL" && session.user.storeId
-      ? { storeId: session.user.storeId }
-      : storeId
-        ? { storeId }
-        : {};
+  const storeFilter: Prisma.ProductWhereInput = storeId ? { storeId } : {};
 
   const taxonomyFilter = buildProductTaxonomyWhere({
     category: category?.trim(),
@@ -62,14 +57,18 @@ export default async function SökPage({ searchParams }: SökPageProps) {
 
   const textFilter = search ? buildProductSearchWhere(search) : {};
 
+  const inStockFilter: Prisma.ProductWhereInput = {
+    OR: [
+      { productType: "SIMPLE", stockQuantity: { gt: 0 } },
+      { productType: "VARIABLE", variants: { some: { stockQuantity: { gt: 0 } } } },
+    ],
+  };
+
   const hasFilters = Boolean(
     query || category || brand || country || storeId,
   );
 
-  const filterStoreId =
-    session?.user.role === "PERSONAL"
-      ? (session.user.storeId ?? undefined)
-      : (storeId ?? undefined);
+  const filterStoreId = storeId ?? undefined;
 
   const searchToken = [query, category ?? "", brand ?? "", country ?? "", storeId ?? ""]
     .join("|")
@@ -82,6 +81,7 @@ export default async function SökPage({ searchParams }: SökPageProps) {
             ...storeFilter,
             ...taxonomyFilter,
             ...textFilter,
+            ...inStockFilter,
           },
           include: {
             store: { select: { id: true, name: true } },
@@ -91,12 +91,10 @@ export default async function SökPage({ searchParams }: SökPageProps) {
           take: 30,
         })
       : Promise.resolve([]),
-    isAdmin
-      ? prisma.store.findMany({
-          orderBy: { name: "asc" },
-          select: { id: true, name: true },
-        })
-      : Promise.resolve([]),
+    prisma.store.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
     loadProductFilterOptions(filterStoreId),
   ]);
 
@@ -108,7 +106,7 @@ export default async function SökPage({ searchParams }: SökPageProps) {
         <ProductSearch
           basePath="/sok"
           submitOnButtonOnly
-          showStoreFilter={isAdmin}
+          showStoreFilter={stores.length > 1}
           stores={stores}
           filterOptions={filterOptions}
           initialQuery={query}
@@ -161,6 +159,7 @@ function serializeSearchProducts(
 ): SearchProduct[] {
   return products.map((product) => ({
     id: product.id,
+    storeId: product.store.id,
     name: product.name,
     productType: product.productType as SearchProduct["productType"],
     storeName: product.store.name,
@@ -172,7 +171,7 @@ function serializeSearchProducts(
     price: Number(product.price),
     ean: product.ean,
     imageUrl: product.imageUrl,
-    metaDescription: product.metaDescription,
+    shortDescription: product.shortDescription,
     stockQuantity: product.stockQuantity,
     stockLocation: product.stockLocation,
     variants: product.variants.map((variant) => ({
@@ -181,7 +180,7 @@ function serializeSearchProducts(
       price: Number(variant.price),
       ean: variant.ean,
       imageUrl: variant.imageUrl,
-      metaDescription: variant.metaDescription,
+      shortDescription: variant.shortDescription,
       stockQuantity: variant.stockQuantity,
       stockLocation: variant.stockLocation,
     })),

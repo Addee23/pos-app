@@ -15,13 +15,6 @@ export async function PATCH(_request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "Ej inloggad" }, { status: 401 });
   }
 
-  if (!session.user.storeId) {
-    return NextResponse.json(
-      { error: "Användaren saknar butik" },
-      { status: 400 },
-    );
-  }
-
   const packLimit = rateLimit({
     key: `pickup-pack:${session.user.id}`,
     limit: 30,
@@ -35,10 +28,7 @@ export async function PATCH(_request: Request, { params }: RouteParams) {
   const { id } = await params;
 
   const pickup = await prisma.pickup.findFirst({
-    where: {
-      id,
-      storeId: session.user.storeId,
-    },
+    where: { id },
     select: { id: true },
   });
 

@@ -8,6 +8,7 @@ import { AdminDashboardLink } from "@/components/layout/AdminDashboardLink";
 import { ProductList } from "@/components/products/ProductList";
 import { ProductSearch } from "@/components/products/ProductSearch";
 import { ProductUpdateTools } from "@/components/products/ProductUpdateTools";
+import { StoreSelector } from "@/components/products/StoreSelector";
 import {
   buildProductTaxonomyWhere,
   loadProductFilterOptions,
@@ -34,8 +35,6 @@ export default async function AdminProductsPage({
     redirect("/kassa");
   }
 
-  const defaultStoreId = session.user.storeId ?? "";
-
   const { q: rawQuery, storeId, page: rawPage, category, brand, country } =
     await searchParams;
   const q = (rawQuery ?? "").trim();
@@ -58,7 +57,7 @@ export default async function AdminProductsPage({
       : {}),
   };
 
-  const [stores, totalProducts, filterOptions, products] = await Promise.all([
+  const [stores, totalProducts, filterOptions, products, rawStoreCounts] = await Promise.all([
     prisma.store.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
@@ -75,7 +74,12 @@ export default async function AdminProductsPage({
       skip: (requestedPage - 1) * PRODUCTS_PER_PAGE,
       take: PRODUCTS_PER_PAGE,
     }),
+    prisma.product.groupBy({ by: ["storeId"], _count: { id: true } }),
   ]);
+
+  const storeCountMap = Object.fromEntries(
+    rawStoreCounts.map((row) => [row.storeId, row._count.id]),
+  );
 
   const totalPages = Math.max(1, Math.ceil(totalProducts / PRODUCTS_PER_PAGE));
   const currentPage = Math.min(requestedPage, totalPages);
@@ -83,11 +87,17 @@ export default async function AdminProductsPage({
   return (
     <section className="flex flex-col gap-4">
       <AdminDashboardLink />
-      <ProductsHeader productCount={totalProducts} storeCount={stores.length} />
+      <ProductsHeader
+        stores={stores}
+        storeCountMap={storeCountMap}
+        currentStoreId={storeId ?? ""}
+        currentQ={q}
+      />
       <Suspense>
         <ProductSearch
           stores={stores}
           filterOptions={filterOptions}
+          showStoreFilter={false}
           initialQuery={q}
           initialStoreId={storeId ?? ""}
           initialCategory={category ?? ""}
@@ -95,10 +105,7 @@ export default async function AdminProductsPage({
           initialCountry={country ?? ""}
         />
       </Suspense>
-      <ProductUpdateTools
-        stores={stores}
-        defaultStoreId={storeId ?? defaultStoreId}
-      />
+      <ProductUpdateTools storeId={storeId ?? ""} />
       <ProductList products={products.map((p) => ({
         id: p.id,
         wooProductId: p.wooProductId,
@@ -146,28 +153,36 @@ export default async function AdminProductsPage({
 }
 
 function ProductsHeader({
-  productCount,
-  storeCount,
+  stores,
+  storeCountMap,
+  currentStoreId,
+  currentQ,
 }: {
-  productCount: number;
-  storeCount: number;
+  stores: { id: string; name: string }[];
+  storeCountMap: Record<string, number>;
+  currentStoreId: string;
+  currentQ: string;
 }) {
+  const grandTotal = Object.values(storeCountMap).reduce((s, n) => s + n, 0);
+
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="rounded-3xl border border-zinc-200 bg-white p-4">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-            Admin
-          </p>
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">Admin</p>
           <h2 className="mt-1 text-xl font-semibold text-zinc-900">Produkter</h2>
-          <p className="mt-2 text-sm leading-6 text-zinc-500">
-            Hantera sortiment, lager och priser.
-          </p>
         </div>
+        <span className="rounded-full bg-zinc-100 px-3 py-1 text-sm font-bold text-zinc-700">
+          {grandTotal} totalt
+        </span>
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-        <SummaryBox label="Totalt produkter" value={String(productCount)} />
-        <SummaryBox label="Butiker" value={String(storeCount)} />
+      <div className="mt-4">
+        <StoreSelector
+          stores={stores}
+          storeCountMap={storeCountMap}
+          currentStoreId={currentStoreId}
+          currentQ={currentQ}
+        />
       </div>
     </div>
   );
@@ -306,11 +321,3 @@ function parsePage(value: string | undefined): number {
   return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
-function SummaryBox({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-zinc-50 px-3 py-2">
-      <p className="text-xs font-medium text-zinc-400">{label}</p>
-      <p className="mt-0.5 text-lg font-semibold text-zinc-900">{value}</p>
-    </div>
-  );
-}

@@ -1,22 +1,5 @@
 type WooObject = Record<string, unknown>;
 
-/** Produktmeta från Woo – sparas i databasen. Plugin-fält filtreras bort. */
-export const WOO_PRODUCT_META_KEYS = [
-  "land",
-  "nyborjarvanligt",
-  "tubos",
-  "handrullad",
-  "format",
-  "tackblad",
-  "kropp",
-  "smak",
-  "filler",
-  "roktid",
-  "matt",
-  "vikt",
-] as const;
-
-export type WooProductMetaKey = (typeof WOO_PRODUCT_META_KEYS)[number];
 
 export function isIgnoredWooMetaKey(key: string): boolean {
   const normalized = key.trim().toLowerCase();
@@ -50,8 +33,10 @@ export function shouldKeepWooMetaKey(key: string): boolean {
 
 export function extractWooProductMetadata(
   product: WooObject,
+  allowedKeys?: string[],
 ): Record<string, unknown> {
   const metadata: Record<string, unknown> = {};
+  const allowed = allowedKeys && allowedKeys.length > 0 ? new Set(allowedKeys) : null;
 
   for (const meta of asArray(product.meta_data).map(asObject)) {
     if (!meta) {
@@ -60,6 +45,10 @@ export function extractWooProductMetadata(
 
     const key = asString(meta.key);
     if (!shouldKeepWooMetaKey(key)) {
+      continue;
+    }
+
+    if (allowed && !allowed.has(key)) {
       continue;
     }
 

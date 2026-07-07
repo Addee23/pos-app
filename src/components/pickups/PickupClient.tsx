@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   PICKUP_DASHBOARD_LIMIT,
   PICKUP_DASHBOARD_REFRESH_MS,
@@ -25,25 +25,28 @@ type PickupItem = {
   stockLocation: string | null;
 };
 
-type PickupUser = {
-  name: string;
-  email: string;
-};
 
 type Pickup = SerializedPickup;
+
+type StoreOption = { id: string; name: string };
 
 type PickupClientProps = {
   initialDashboard: PickupDashboardPayload;
   currentRole: UserRole;
+  stores: StoreOption[];
 };
 
 export function PickupClient({
   initialDashboard,
   currentRole,
+  stores,
 }: PickupClientProps) {
   const toast = useToast();
   const [query, setQuery] = useState("");
   const [dashboard, setDashboard] = useState(initialDashboard);
+  const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>(
+    stores.map((s) => s.id),
+  );
   const [searchResults, setSearchResults] = useState<Pickup[] | null>(null);
   const [activeTab, setActiveTab] = useState<PickupDashboardTab>(() =>
     initialDashboard.counts.needsHandling > 0 ? "needsHandling" : "readyForPickup",
@@ -54,7 +57,10 @@ export function PickupClient({
   const [activePickupId, setActivePickupId] = useState<string | null>(null);
   const [popupOpen, setPopupOpen] = useState(false);
   const [selectedPickupId, setSelectedPickupId] = useState<string | null>(null);
-  const tabPickups = dashboard[activeTab];
+  const allSelected = selectedStoreIds.length === stores.length;
+  const tabPickups = (dashboard[activeTab] as Pickup[]).filter(
+    (p) => allSelected || selectedStoreIds.includes(p.storeId),
+  );
   const totalForTab = dashboard.counts[activeTab];
 
   const refreshDashboard = useCallback(async () => {
@@ -108,7 +114,7 @@ export function PickupClient({
     return searchResults ?? [];
   }, [searchResults, selectedPickupId, tabPickups]);
 
-  async function handleSearch(event: FormEvent<HTMLFormElement>) {
+  async function handleSearch(event: { preventDefault(): void }) {
     event.preventDefault();
     setIsSearching(true);
     setPopupOpen(false);
@@ -276,6 +282,36 @@ export function PickupClient({
           Upphämtningar
         </h2>
 
+        {currentRole === "PERSONAL" && stores.length > 1 && (
+          <div className="mt-3 flex flex-col gap-1.5">
+            <p className="text-xs font-semibold text-zinc-500">Visa butik(er)</p>
+            <div className="flex flex-col gap-1 rounded-lg border border-zinc-200 p-2.5">
+              <CircleCheckLabel
+                checked={allSelected}
+                onChange={(checked) =>
+                  setSelectedStoreIds(checked ? stores.map((s) => s.id) : [])
+                }
+                label="Alla butiker"
+                bold
+              />
+              {stores.map((store) => (
+                <CircleCheckLabel
+                  key={store.id}
+                  checked={selectedStoreIds.includes(store.id)}
+                  onChange={() =>
+                    setSelectedStoreIds((prev) =>
+                      prev.includes(store.id)
+                        ? prev.filter((id) => id !== store.id)
+                        : [...prev, store.id],
+                    )
+                  }
+                  label={store.name}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         <PickupDashboardTabs
           activeTab={activeTab}
           counts={dashboard.counts}
@@ -358,7 +394,6 @@ export function PickupClient({
             setSelectedPickupId(null);
           }}
           onPack={packPickup}
-          onComplete={completePickup}
         />
       ) : null}
     </section>
@@ -514,7 +549,6 @@ function PickupPopup({
   onCancel,
   onClose,
   onPack,
-  onComplete,
 }: {
   pickups: Pickup[];
   activePickupId: string | null;
@@ -522,18 +556,23 @@ function PickupPopup({
   onCancel: (pickupId: string) => void;
   onClose: () => void;
   onPack: (pickupId: string) => void;
-  onComplete: (pickupId: string) => void;
 }) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-zinc-950/35 px-3 pb-3 pt-10 lg:items-center lg:p-6" onClick={onClose}>
-      <section className="max-h-[88vh] w-full max-w-[430px] overflow-y-auto rounded-[2rem] bg-[#f3eee5] p-4 shadow-2xl lg:max-w-xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-90 flex items-end justify-center bg-zinc-950/35 px-3 pb-3 pt-10 lg:items-center lg:p-6" onClick={onClose}>
+      <section className="max-h-[88vh] w-full max-w-107.5 overflow-y-auto rounded-4xl bg-[#f3eee5] p-4 shadow-2xl lg:max-w-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-orange-600">
               Upphämtning
             </p>
             <h3 className="mt-1 text-lg font-bold text-[#43342c]">
-              Kontrollera ordern
+              Plocklista
             </h3>
           </div>
           <div className="flex items-center gap-2">
@@ -583,7 +622,9 @@ function PickupPopup({
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-zinc-300">
-                  <th className="w-6 py-2 text-left">☐</th>
+                  <th className="w-8 py-2 text-left">
+                    <span style={{ display: "inline-block", width: 18, height: 18, borderRadius: "50%", border: "2px solid #aaa", verticalAlign: "middle" }} />
+                  </th>
                   <th className="py-2 text-left font-bold">Produkt</th>
                   <th className="py-2 text-center font-bold">Antal</th>
                   <th className="py-2 text-left font-bold">Hylla</th>
@@ -592,7 +633,9 @@ function PickupPopup({
               <tbody>
                 {pickup.items.map((item) => (
                   <tr key={item.id} className="border-b border-zinc-200">
-                    <td className="py-2 text-lg">☐</td>
+                    <td className="py-2">
+                      <span style={{ display: "inline-block", width: 18, height: 18, borderRadius: "50%", border: "2px solid #aaa", verticalAlign: "middle" }} />
+                    </td>
                     <td className="py-2 font-medium">{itemLabel(item)}</td>
                     <td className="py-2 text-center font-bold">{item.quantity}</td>
                     <td className="py-2">{item.stockLocation ?? "–"}</td>
@@ -610,12 +653,12 @@ function PickupPopup({
 
             <div className="mt-6 flex gap-8 text-sm">
               <div>
-                <p className="text-xs font-bold uppercase text-zinc-500">Kundmail</p>
-                <p>{pickup.customerEmail ?? "Saknas"}</p>
+                <p className="text-xs font-bold uppercase text-zinc-500">Packad av</p>
+                <p className="mt-4 border-b border-zinc-400 w-40">&nbsp;</p>
               </div>
               <div>
-                <p className="text-xs font-bold uppercase text-zinc-500">Signatur</p>
-                <p className="mt-4 border-b border-zinc-400 w-40">&nbsp;</p>
+                <p className="text-xs font-bold uppercase text-zinc-500">Kontroll</p>
+                <p className="mt-4 border-b border-zinc-400 w-28">&nbsp;</p>
               </div>
             </div>
           </div>
@@ -642,29 +685,50 @@ function PickupCard({
   onComplete: (pickupId: string) => void;
   onOpenPopup: (pickupId: string) => void;
 }) {
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const canPack = pickup.status === "AWAITING_PACK";
   const canComplete = pickup.status === "READY";
   const canCancel =
     currentRole === "ADMIN" &&
     (pickup.status === "AWAITING_PACK" || pickup.status === "READY");
 
+  const firstItemImage = pickup.items[0]?.productImageUrl ?? null;
+
   return (
     <article className="rounded-lg border border-zinc-200 bg-white p-4">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-base font-semibold text-zinc-900">
-            {pickup.customerName}
+      {zoomedImage ? (
+        <ImageLightbox imageUrl={zoomedImage} onClose={() => setZoomedImage(null)} />
+      ) : null}
+      <div className="flex gap-3">
+        {firstItemImage ? (
+          <button
+            type="button"
+            onClick={() => setZoomedImage(firstItemImage)}
+            aria-label="Förstora produktbild"
+            className="size-14 shrink-0 cursor-pointer rounded-xl border border-[#dfd4c6] bg-white bg-contain bg-center bg-no-repeat transition-opacity hover:opacity-75"
+            style={{ backgroundImage: `url("${firstItemImage}")` }}
+          />
+        ) : (
+          <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-[10px] font-bold text-orange-700">
+            Bild
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-base font-semibold text-zinc-900">
+              {pickup.customerName}
+            </p>
+            <StatusBadge status={pickup.status} />
+          </div>
+          <p className="mt-1 text-sm font-medium text-zinc-600">
+            {pickup.pickupCode}
           </p>
-          <StatusBadge status={pickup.status} />
+          <p className="mt-1 line-clamp-1 text-sm text-zinc-500">
+            {pickup.items.length > 0
+              ? pickup.items.map(itemLabel).join(", ")
+              : "Produktinfo saknas"}
+          </p>
         </div>
-        <p className="mt-1 text-sm font-medium text-zinc-600">
-          {pickup.pickupCode}
-        </p>
-        <p className="mt-1 line-clamp-1 text-sm text-zinc-500">
-          {pickup.items.length > 0
-            ? pickup.items.map(itemLabel).join(", ")
-            : "Produktinfo saknas"}
-        </p>
       </div>
 
       {pickup.notes ? (
@@ -673,7 +737,7 @@ function PickupCard({
         </p>
       ) : null}
 
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <div className={`mt-4 grid gap-2 ${canPack ? "grid-cols-1" : "grid-cols-2"}`}>
         <button
           type="button"
           onClick={() => onOpenPopup(pickup.id)}
@@ -681,18 +745,7 @@ function PickupCard({
         >
           Visa
         </button>
-        {canPack ? (
-          <label className={`flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 text-sm font-semibold text-orange-700 transition hover:bg-orange-100 ${isSaving ? "cursor-not-allowed opacity-60" : ""}`}>
-            <input
-              type="checkbox"
-              checked={false}
-              disabled={isSaving}
-              onChange={() => onPack(pickup.id)}
-              className="size-4 cursor-pointer accent-orange-500"
-            />
-            {isSaving ? "Sparar..." : "Markera packad"}
-          </label>
-        ) : (
+        {!canPack && (
           <button
             type="button"
             disabled={!canComplete || isSaving}
@@ -744,12 +797,14 @@ function PickupInfoCard({
 }) {
   const toast = useToast();
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
+  const [packConfirmPending, setPackConfirmPending] = useState(false);
   const canPack = pickup.status === "AWAITING_PACK";
   const canCancel =
     currentRole === "ADMIN" &&
     (pickup.status === "AWAITING_PACK" || pickup.status === "READY");
 
   function toggleItem(id: string) {
+    setPackConfirmPending(false);
     setCheckedItems((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -758,14 +813,19 @@ function PickupInfoCard({
     });
   }
 
-  function warnIfIncomplete(action: () => void) {
+  function handlePackClick(action: () => void) {
     const total = pickup.items.length;
     const checked = checkedItems.size;
     if (total > 0 && checked < total) {
-      toast.warning(
-        `${checked} av ${total} varor är avprickade. Kontrollera att du plockat allt.`,
-      );
+      if (!packConfirmPending) {
+        toast.warning(
+          `${checked} av ${total} varor är avprickade. Gå tillbaka och pricka av resten, eller klicka igen för att packa ändå.`,
+        );
+        setPackConfirmPending(true);
+        return;
+      }
     }
+    setPackConfirmPending(false);
     action();
   }
 
@@ -820,14 +880,20 @@ function PickupInfoCard({
       </div>
 
       {canPack ? (
-        <button
-          type="button"
-          disabled={isSaving}
-          onClick={() => warnIfIncomplete(() => onPack(pickup.id))}
-          className="mt-4 min-h-12 w-full cursor-pointer rounded-xl bg-orange-500 px-4 text-sm font-bold text-white shadow-sm shadow-orange-200 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isSaving ? "Packar..." : "Markera som packad och skicka mail"}
-        </button>
+        <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+          <CircleCheckLabel
+            checked={isSaving}
+            onChange={() => !isSaving && handlePackClick(() => onPack(pickup.id))}
+            label={
+              isSaving
+                ? "Packar..."
+                : packConfirmPending
+                  ? "Klicka igen för att packa ändå"
+                  : "Markera som packad och skicka mail"
+            }
+            bold
+          />
+        </div>
       ) : null}
 
       {canCancel ? (
@@ -853,71 +919,101 @@ function PickupProductRow({
   checked: boolean;
   onToggle?: () => void;
 }) {
-  if (!onToggle) {
-    return (
-      <div className="rounded-2xl bg-white p-3">
-        <p className="text-sm font-bold text-[#43342c]">{itemLabel(item)}</p>
-        <p className="mt-1 text-xs font-semibold text-orange-700">Antal: {item.quantity}</p>
-        <p className={`mt-1 text-xs font-semibold ${item.stockLocation ? "text-[#43342c]" : "text-zinc-400"}`}>
-          Hylla: {item.stockLocation ?? "Saknas"}
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <label
-      className={`flex cursor-pointer items-start gap-3 rounded-2xl p-3 transition ${
-        checked ? "bg-emerald-50" : "bg-white"
-      }`}
-    >
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={onToggle}
-        className="mt-0.5 size-5 shrink-0 cursor-pointer accent-emerald-600"
-      />
-      <div className="min-w-0">
-        <p className={`text-sm font-bold transition ${checked ? "text-zinc-400 line-through" : "text-[#43342c]"}`}>
-          {itemLabel(item)}
-        </p>
-        <p className={`mt-1 text-xs font-semibold ${checked ? "text-zinc-400" : "text-orange-700"}`}>
-          Antal: {item.quantity}
-        </p>
-        <p className={`mt-1 text-xs font-semibold ${item.stockLocation ? (checked ? "text-zinc-400" : "text-[#43342c]") : "text-zinc-400"}`}>
-          Hylla: {item.stockLocation ?? "Saknas"}
-        </p>
-      </div>
-    </label>
-  );
-}
-
-function PickupItemImage({
-  item,
-  large = false,
-}: {
-  item: PickupItem | undefined;
-  large?: boolean;
-}) {
-  const sizeClass = large ? "size-[72px] rounded-2xl" : "size-14 rounded-xl";
-
-  if (!item?.productImageUrl) {
-    return (
-      <div
-        className={`flex shrink-0 items-center justify-center bg-orange-50 text-[10px] font-bold text-orange-700 ${sizeClass}`}
-      >
-        Bild
-      </div>
-    );
-  }
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
   return (
     <div
-      aria-label={item.productName}
-      role="img"
-      className={`shrink-0 border border-[#dfd4c6] bg-white bg-contain bg-center bg-no-repeat ${sizeClass}`}
-      style={{ backgroundImage: `url("${item.productImageUrl}")` }}
-    />
+      className={`flex items-center gap-3 rounded-2xl p-3 transition ${onToggle ? "cursor-pointer" : ""} ${checked ? "bg-emerald-50" : "bg-white"}`}
+      onClick={onToggle}
+    >
+      {zoomedImage ? (
+        <ImageLightbox imageUrl={zoomedImage} onClose={() => setZoomedImage(null)} />
+      ) : null}
+
+      {/* Rund produktbild till vänster */}
+      {item.productImageUrl ? (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setZoomedImage(item.productImageUrl!); }}
+          aria-label="Förstora produktbild"
+          className="size-12 shrink-0 cursor-pointer rounded-full border border-[#dfd4c6] bg-white bg-cover bg-center transition-opacity hover:opacity-75"
+          style={{ backgroundImage: `url("${item.productImageUrl}")` }}
+        />
+      ) : (
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-orange-50 text-[10px] font-bold text-orange-700">
+          Bild
+        </div>
+      )}
+
+      {/* Produktinfo i mitten */}
+      <div className="min-w-0 flex-1">
+        <p className={`text-sm font-bold transition ${checked ? "text-zinc-400 line-through" : "text-[#43342c]"}`}>
+          {itemLabel(item)}
+        </p>
+        <p className={`mt-0.5 text-xs font-semibold ${checked ? "text-zinc-400" : "text-orange-700"}`}>
+          {item.quantity} st
+        </p>
+        <p className={`mt-0.5 text-xs font-semibold ${item.stockLocation ? (checked ? "text-zinc-400" : "text-[#6a5b50]") : "text-zinc-400"}`}>
+          Hylla: {item.stockLocation ?? "Saknas"}
+        </p>
+      </div>
+
+      {/* Rund checkbox (CodePen-stil) */}
+      {onToggle ? (
+        <div
+          className="relative size-7 shrink-0 rounded-full border transition-colors"
+          style={{
+            backgroundColor: checked ? "#66bb6a" : "#fff",
+            borderColor: checked ? "#66bb6a" : "#ccc",
+          }}
+        >
+          <div
+            className="-rotate-45 border-b-2 border-l-2 border-white transition-opacity"
+            style={{
+              position: "absolute",
+              left: 7,
+              top: 8,
+              width: 12,
+              height: 6,
+              opacity: checked ? 1 : 0,
+            }}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+
+function ImageLightbox({
+  imageUrl,
+  onClose,
+}: {
+  imageUrl: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-200 flex items-center justify-center bg-black/75 p-6"
+      onClick={onClose}
+    >
+      <div
+        className="flex size-72 items-center justify-center rounded-2xl bg-white p-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <img
+          src={imageUrl}
+          alt="Produktbild"
+          className="size-full object-contain"
+        />
+      </div>
+    </div>
   );
 }
 
@@ -927,16 +1023,6 @@ function itemLabel(item: PickupItem): string {
     : item.productName;
 }
 
-function SummaryBox({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-lg bg-zinc-50 px-3 py-2">
-      <p className="text-xs font-medium text-zinc-400">{label}</p>
-      <p className="mt-0.5 truncate text-lg font-semibold text-zinc-900">
-        {value}
-      </p>
-    </div>
-  );
-}
 
 function StatusBadge({ status }: { status: PickupStatus }) {
   const labels: Record<PickupStatus, string> = {
@@ -975,7 +1061,7 @@ function ProductFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-[#dfd4c6] bg-[#f3eee5] px-3 py-2 text-xs last:border-b-0">
       <p className="font-bold text-[#6a5b50]">{label}</p>
-      <p className="max-w-40 break-words text-right font-bold text-blue-700">
+      <p className="max-w-40 wrap-break-word text-right font-bold text-blue-700">
         {value}
       </p>
     </div>
@@ -1027,4 +1113,49 @@ function formatDate(date: string | Date): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(date));
+}
+
+function CircleCheckLabel({
+  checked,
+  onChange,
+  label,
+  bold = false,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  bold?: boolean;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2.5 py-0.5">
+      <input
+        type="checkbox"
+        className="sr-only"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <div
+        className="relative size-7 shrink-0 rounded-full border transition-colors"
+        style={{
+          backgroundColor: checked ? "#66bb6a" : "#fff",
+          borderColor: checked ? "#66bb6a" : "#ccc",
+        }}
+      >
+        <div
+          className="-rotate-45 border-b-2 border-l-2 border-white transition-opacity"
+          style={{
+            position: "absolute",
+            left: 7,
+            top: 8,
+            width: 12,
+            height: 6,
+            opacity: checked ? 1 : 0,
+          }}
+        />
+      </div>
+      <span className={`text-sm ${bold ? "font-semibold text-zinc-800" : "text-zinc-700"}`}>
+        {label}
+      </span>
+    </label>
+  );
 }

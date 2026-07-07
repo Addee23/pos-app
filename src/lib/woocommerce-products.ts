@@ -5,11 +5,15 @@ import {
   extractWooCountry,
 } from "@/lib/woo-product-taxonomy";
 import { inferProductTaxonomy } from "@/lib/product-taxonomy-options";
-import { extractWooProductMetadata } from "@/lib/woo-product-metadata";
+import { extractWooProductMetadata, formatStoredMetaValue } from "@/lib/woo-product-metadata";
+import { normalizeBrand } from "@/lib/product-taxonomy-options";
+
+const BRAND_META_KEYS = ["varumärke", "varumarke", "brand", "marke"];
 
 export type WooProductImportInput = {
   products: unknown[];
   loadVariations?: (productId: number) => Promise<unknown[]>;
+  allowedMetaKeys?: string[];
 };
 
 export type ImportedWooProduct = {
@@ -49,6 +53,7 @@ type WooObject = Record<string, unknown>;
 export async function normalizeWooProducts({
   products,
   loadVariations,
+  allowedMetaKeys,
 }: WooProductImportInput): Promise<ImportedWooProduct[]> {
   const normalized: ImportedWooProduct[] = [];
 
@@ -71,7 +76,12 @@ export async function normalizeWooProducts({
     const category =
       extractWooCategory(product) ??
       inferProductTaxonomy({ name, shortDescription }).category;
+
+    // Extrahera meta först — brand hämtas därifrån om admin konfigurerat nyckeln
+    const wooMeta = extractWooProductMetadata(product, allowedMetaKeys);
+    const brandFromMeta = extractBrandFromMeta(wooMeta);
     const brand =
+      brandFromMeta ??
       extractWooBrand(product) ??
       inferProductTaxonomy({ name, shortDescription }).brand;
 
@@ -99,7 +109,7 @@ export async function normalizeWooProducts({
       country,
       wooMetadata: {
         ...(brand ? { brand } : {}),
-        ...extractWooProductMetadata(product),
+        ...wooMeta,
       },
       variants: variationDetails.map((variant, index) =>
         normalizeVariant(variant, product, index),
@@ -240,6 +250,17 @@ function asObject(value: unknown): WooObject | null {
 
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
+}
+
+function extractBrandFromMeta(meta: Record<string, unknown>): string | null {
+  for (const key of BRAND_META_KEYS) {
+    const match = Object.keys(meta).find((k) => k.toLowerCase() === key);
+    if (match) {
+      const raw = formatStoredMetaValue(meta[match]);
+      if (raw) return normalizeBrand(raw);
+    }
+  }
+  return null;
 }
 
 function asString(value: unknown): string {

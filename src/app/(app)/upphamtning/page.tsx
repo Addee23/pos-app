@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { PickupClient } from "@/components/pickups/PickupClient";
 import { loadPickupDashboard } from "@/lib/pickup-dashboard-data";
 
@@ -9,20 +10,16 @@ export default async function UpphämtningPage() {
     redirect("/login");
   }
 
-  if (!session.user.storeId) {
-    return (
-      <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-        Användaren saknar butik och kan därför inte se upphämtningar.
-      </p>
-    );
-  }
-
-  const initialDashboard = await loadPickupDashboard(session.user.storeId);
+  const [initialDashboard, stores] = await Promise.all([
+    loadPickupDashboard(null),
+    prisma.store.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+  ]);
 
   return (
     <PickupClient
       initialDashboard={initialDashboard}
       currentRole={session.user.role}
+      stores={stores}
     />
   );
 }

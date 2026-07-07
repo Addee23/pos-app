@@ -5,7 +5,7 @@ import {
   ReceiptStoreLogo,
   resolveReceiptLogoUrl,
 } from "@/components/pos/ReceiptStoreLogo";
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 export type PosStore = {
   id: string;
@@ -84,11 +84,41 @@ export function KassaClient({ store, isAdmin = false, allStores }: KassaClientPr
   const [cart, setCart] = useState<CartItem[]>([]);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [saving, setSaving] = useState(false);
+  const [browseProducts, setBrowseProducts] = useState<GroupedSearchProduct[]>([]);
+  const [browsePage, setBrowsePage] = useState(1);
+  const [browseHasMore, setBrowseHasMore] = useState(false);
+  const [browseLoading, setBrowseLoading] = useState(false);
+  const [browseTotal, setBrowseTotal] = useState(0);
 
   const total = cart.reduce(
     (sum, item) => sum + item.unitPrice * item.quantity,
     0,
   );
+
+  async function loadBrowse(page: number, reset: boolean) {
+    setBrowseLoading(true);
+    try {
+      const res = await fetch(
+        `/api/pos/products?storeId=${encodeURIComponent(store.id)}&page=${page}`,
+      );
+      if (!res.ok) return;
+      const data = (await res.json()) as { items: SearchItem[]; hasMore: boolean; total: number };
+      const groups = groupSearchResults(data.items);
+      setBrowseProducts((prev) => (reset ? groups : [...prev, ...groups]));
+      setBrowseHasMore(data.hasMore);
+      setBrowseTotal(data.total);
+      setBrowsePage(page);
+    } catch {
+      /* ignore */
+    } finally {
+      setBrowseLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadBrowse(1, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.id]);
 
   async function searchProducts(formData: FormData) {
     const nextQuery = String(formData.get("q") ?? "").trim();
@@ -160,20 +190,15 @@ export function KassaClient({ store, isAdmin = false, allStores }: KassaClientPr
       return;
     }
 
+    const existing = cart.find((item) => item.cartKey === nextItem.cartKey);
+    if (existing && existing.quantity >= existing.maxQuantity) {
+      toast.error("Det finns inte fler i lager.");
+      return;
+    }
+
     setCart((currentCart) => {
-      const existing = currentCart.find(
-        (item) => item.cartKey === nextItem.cartKey,
-      );
-
-      if (!existing) {
-        return [...currentCart, nextItem];
-      }
-
-      if (existing.quantity >= existing.maxQuantity) {
-        toast.error("Det finns inte fler i lager.");
-        return currentCart;
-      }
-
+      const found = currentCart.find((item) => item.cartKey === nextItem.cartKey);
+      if (!found) return [...currentCart, nextItem];
       return currentCart.map((item) =>
         item.cartKey === nextItem.cartKey
           ? { ...item, quantity: item.quantity + 1 }
@@ -202,34 +227,36 @@ export function KassaClient({ store, isAdmin = false, allStores }: KassaClientPr
   }
 
   function changeQuantity(cartKey: string, change: number) {
+    const item = cart.find((i) => i.cartKey === cartKey);
+    if (item) {
+      const next = item.quantity + change;
+      if (next > item.maxQuantity) {
+        toast.error(`Bara ${item.maxQuantity} st i lager för "${item.name}".`);
+        return;
+      }
+    }
     setCart((currentCart) =>
-      currentCart.flatMap((item) => {
-        if (item.cartKey !== cartKey) {
-          return [item];
-        }
-
-        const nextQuantity = item.quantity + change;
-        if (nextQuantity <= 0) {
-          return [];
-        }
-
-        if (nextQuantity > item.maxQuantity) {
-          toast.error("Det finns inte fler i lager.");
-          return [item];
-        }
-
-        return [{ ...item, quantity: nextQuantity }];
+      currentCart.flatMap((i) => {
+        if (i.cartKey !== cartKey) return [i];
+        const next = i.quantity + change;
+        if (next <= 0) return [];
+        return [{ ...i, quantity: next }];
       }),
     );
   }
 
-  function setExactQuantity(cartKey: string, value: number) {
+  function setExactQuantity(cartKey: string, value: number, notify = false) {
+    if (notify) {
+      const item = cart.find((i) => i.cartKey === cartKey);
+      if (item && value > item.maxQuantity) {
+        toast.error(`Bara ${item.maxQuantity} st i lager för "${item.name}".`);
+      }
+    }
     setCart((currentCart) =>
       currentCart.flatMap((item) => {
         if (item.cartKey !== cartKey) return [item];
         if (value <= 0) return [];
-        const clamped = Math.min(value, item.maxQuantity);
-        return [{ ...item, quantity: clamped }];
+        return [{ ...item, quantity: Math.min(value, item.maxQuantity) }];
       }),
     );
   }
@@ -274,6 +301,7 @@ export function KassaClient({ store, isAdmin = false, allStores }: KassaClientPr
       setSearchResults([]);
       setResultPopupOpen(false);
       toast.success("Köpet slutfördes och lagret uppdaterades.");
+      void loadBrowse(1, true);
     } catch (error) {
       console.error(error);
       toast.error("Något gick fel vid anropet. Försök igen.");
@@ -335,6 +363,43 @@ export function KassaClient({ store, isAdmin = false, allStores }: KassaClientPr
             {searching ? "Söker..." : "Sök produkt"}
           </button>
         </form>
+
+        <div className="flex flex-col gap-3">
+          <p className="text-xs font-semibold text-zinc-400">
+            Produkter i lager{browseTotal > 0 ? ` (${browseTotal})` : ""}
+          </p>
+
+          {browseLoading && browseProducts.length === 0 ? (
+            <p className="py-6 text-center text-sm text-zinc-400">Laddar produkter...</p>
+          ) : browseProducts.length === 0 ? (
+            <p className="py-6 text-center text-sm text-zinc-400">Inga produkter i lager.</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-3">
+                {browseProducts.map((group) => (
+                  <SearchProductCard
+                    key={group.productId}
+                    group={group}
+                    onAdd={(item) => {
+                      addSearchItem(item);
+                      toast.success(`${displayName(item)} lades till i varukorgen.`);
+                    }}
+                  />
+                ))}
+              </div>
+              {browseHasMore ? (
+                <button
+                  type="button"
+                  onClick={() => void loadBrowse(browsePage + 1, false)}
+                  disabled={browseLoading}
+                  className="min-h-11 w-full cursor-pointer rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-bold text-zinc-700 shadow-sm transition hover:border-orange-300 hover:text-orange-700 disabled:opacity-60"
+                >
+                  {browseLoading ? "Laddar..." : "Ladda mer"}
+                </button>
+              ) : null}
+            </>
+          )}
+        </div>
       </section>
 
       <div className="flex flex-col gap-4 lg:sticky lg:top-24">
@@ -379,6 +444,12 @@ function SearchResultPopup({
 }) {
   const groupedResults = groupSearchResults(results);
   const singleGroup = groupedResults.length === 1 ? groupedResults[0] : null;
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   function handleSectionClick(e: React.MouseEvent) {
     e.stopPropagation();
@@ -451,7 +522,7 @@ function SearchProductCard({
 
   return (
     <article
-      className={`group flex w-[calc(50%-6px)] flex-col overflow-hidden rounded-2xl shadow-sm transition-transform active:scale-95 ${
+      className={`group flex w-[calc(50%-6px)] flex-col overflow-hidden rounded-2xl shadow-sm ${
         outOfStock
           ? "border border-red-200 bg-red-50"
           : "cursor-pointer border border-[#dfd4c6] bg-[#f8f4ed] hover:border-orange-300 hover:shadow-md"
@@ -496,7 +567,7 @@ function SearchProductCard({
         </div>
       ) : null}
 
-      <div className="px-2.5 pb-2.5">
+      <div className="mt-auto px-2.5 pb-2.5">
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); if (!outOfStock) onAdd(selectedItem); }}
@@ -607,7 +678,7 @@ function CartPanel({
   saving: boolean;
   isAdmin: boolean;
   onChangeQuantity: (cartKey: string, change: number) => void;
-  onSetQuantity: (cartKey: string, value: number) => void;
+  onSetQuantity: (cartKey: string, value: number, notify?: boolean) => void;
   onCancelCart: () => void;
   onCompleteSale: () => void;
 }) {
@@ -671,12 +742,12 @@ function CartPanel({
                     onChange={(e) => {
                       const val = parseInt(e.target.value, 10);
                       if (!isNaN(val) && val >= 1) {
-                        onSetQuantity(item.cartKey, val);
+                        onSetQuantity(item.cartKey, val, true);
                       }
                     }}
                     onBlur={(e) => {
                       const val = parseInt(e.target.value, 10);
-                      onSetQuantity(item.cartKey, isNaN(val) || val < 1 ? 1 : val);
+                      onSetQuantity(item.cartKey, isNaN(val) || val < 1 ? 1 : val, false);
                     }}
                     className="min-h-9 w-full rounded-xl border border-zinc-200 text-center text-sm font-semibold text-zinc-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   />

@@ -39,26 +39,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Ej inloggad" }, { status: 401 });
   }
 
-  const isAdmin = session.user.role === "ADMIN";
-  let userStoreId: string;
+  const { searchParams: sp } = new URL(request.url);
+  const paramStoreId = sp.get("storeId");
 
-  if (isAdmin) {
-    const { searchParams: sp } = new URL(request.url);
-    const paramStoreId = sp.get("storeId");
-    if (!paramStoreId) {
-      return NextResponse.json({ error: "Ange storeId" }, { status: 400 });
-    }
-    userStoreId = paramStoreId;
-  } else {
-    const freshUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { storeId: true },
-    });
-    if (!freshUser?.storeId) {
-      return NextResponse.json({ error: "Användaren saknar butik" }, { status: 400 });
-    }
-    userStoreId = freshUser.storeId;
+  if (!paramStoreId) {
+    return NextResponse.json({ error: "Ange storeId" }, { status: 400 });
   }
+  const userStoreId = paramStoreId;
 
   const searchLimit = rateLimit({
     key: `pos-search:${session.user.id}`,

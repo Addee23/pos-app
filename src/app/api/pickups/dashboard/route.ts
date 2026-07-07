@@ -9,13 +9,6 @@ export async function GET() {
     return NextResponse.json({ error: "Ej inloggad" }, { status: 401 });
   }
 
-  if (!session.user.storeId) {
-    return NextResponse.json(
-      { error: "Användaren saknar butik" },
-      { status: 400 },
-    );
-  }
-
   const refreshLimit = rateLimit({
     key: `pickup-dashboard:${session.user.id}`,
     limit: 90,
@@ -31,6 +24,6 @@ export async function GET() {
     );
   }
 
-  const dashboard = await loadPickupDashboard(session.user.storeId);
+  const dashboard = await loadPickupDashboard(null);
   return NextResponse.json(dashboard);
 }

@@ -19,13 +19,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Ej inloggad" }, { status: 401 });
   }
 
-  if (!session.user.storeId) {
-    return NextResponse.json(
-      { error: "Användaren saknar butik" },
-      { status: 400 },
-    );
-  }
-
   const searchLimit = rateLimit({
     key: `pickup-search:${session.user.id}`,
     limit: 60,
@@ -52,7 +45,6 @@ export async function GET(request: Request) {
 
   const pickups = await prisma.pickup.findMany({
     where: {
-      storeId: session.user.storeId,
       ...(search ? buildPickupSearchWhere(search) : {}),
     },
     include: pickupResponseInclude,

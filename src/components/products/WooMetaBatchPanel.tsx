@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useToast } from "@/components/ui/ToastProvider";
 import {
-  WOO_META_FIELD_SUGGESTIONS,
   type WooMetaPreviewRow,
 } from "@/lib/woo-meta-preview";
 
@@ -39,6 +38,7 @@ export function WooMetaBatchPanel({
   const [activeField, setActiveField] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<{ input: string; label: string }[]>([]);
 
   useEffect(() => {
     if (lockStoreId) {
@@ -47,6 +47,19 @@ export function WooMetaBatchPanel({
       setLoaded(false);
     }
   }, [lockStoreId]);
+
+  useEffect(() => {
+    if (!storeId) return;
+    void fetch(`/api/stores/${storeId}/meta-labels`)
+      .then((r) => r.json())
+      .then((data: { labels?: Record<string, string> }) => {
+        const labels = data.labels ?? {};
+        setSuggestions(
+          Object.entries(labels).map(([key, label]) => ({ input: key, label: label || key })),
+        );
+      })
+      .catch(() => setSuggestions([]));
+  }, [storeId]);
 
   function selectFieldSuggestion(input: string) {
     setFieldInput(input);
@@ -159,7 +172,7 @@ export function WooMetaBatchPanel({
         </label>
 
         <div className="flex flex-wrap gap-2">
-          {WOO_META_FIELD_SUGGESTIONS.map((suggestion) => {
+          {suggestions.map((suggestion) => {
             const active = fieldInput.trim().toLowerCase() === suggestion.input;
 
             return (
