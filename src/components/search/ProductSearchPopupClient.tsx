@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/ToastProvider";
+import { clearCart, saveCart } from "@/lib/cart-storage";
+import { asMetadataRecord, formatStoredMetaValue } from "@/lib/woo-product-metadata";
 
 export type SearchProduct = {
   id: string;
@@ -20,6 +22,7 @@ export type SearchProduct = {
   shortDescription: string | null;
   stockQuantity: number;
   stockLocation: string | null;
+  wooMetadata: Record<string, unknown> | null;
   variants: SearchProductVariant[];
 };
 
@@ -41,7 +44,10 @@ type SökCartItem = {
   storeId: string;
   name: string;
   variantName: string | null;
+  ean: string | null;
   imageUrl: string | null;
+  description: string | null;
+  stockLocation: string | null;
   price: number;
   quantity: number;
   maxQuantity: number;
@@ -51,31 +57,67 @@ type ProductSearchPopupClientProps = {
   products: SearchProduct[];
   hasQuery: boolean;
   searchToken: string;
+  filterVersion?: number;
+  storeMetaLabels?: Record<string, Record<string, string>>;
 };
 
 export function ProductSearchPopupClient({
   products,
   hasQuery,
   searchToken,
+  filterVersion = 0,
+  storeMetaLabels = {},
 }: ProductSearchPopupClientProps) {
   const toast = useToast();
   const [dismissedToken, setDismissedToken] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(() => hasQuery && products.length > 0);
+  const [resultsStale, setResultsStale] = useState(false);
   const [cart, setCart] = useState<SökCartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const filterVersionMounted = useRef(false);
 
   useEffect(() => {
     if (!hasQuery) {
       setIsOpen(false);
       setDismissedToken(null);
+      setResultsStale(false);
       return;
     }
     if (products.length > 0 && dismissedToken !== searchToken) {
       setIsOpen(true);
+      setResultsStale(false);
     }
   }, [hasQuery, products.length, searchToken, dismissedToken]);
+
+  useEffect(() => {
+    if (!filterVersionMounted.current) {
+      filterVersionMounted.current = true;
+      return;
+    }
+    setIsOpen(false);
+    setResultsStale(true);
+  }, [filterVersion]);
+
+  useEffect(() => {
+    if (cart.length === 0) return;
+    saveCart(cart[0].storeId, cart.map((item) => ({
+      cartKey: item.key,
+      productId: item.productId,
+      variantId: item.variantId,
+      storeId: item.storeId,
+      name: item.name,
+      variantName: item.variantName,
+      ean: item.ean,
+      imageUrl: item.imageUrl,
+      description: item.description ?? "",
+      stockLocation: item.stockLocation,
+      price: item.price,
+      quantity: item.quantity,
+      maxQuantity: item.maxQuantity,
+    })));
+  }, [cart]);
 
   function handleClose() {
     setIsOpen(false);
@@ -119,7 +161,10 @@ export function ProductSearchPopupClient({
           storeId: product.storeId,
           name: product.name,
           variantName: option.variantName,
+          ean: option.ean,
           imageUrl: option.imageUrl ?? product.imageUrl,
+          description: option.description,
+          stockLocation: option.stockLocation,
           price: option.price,
           quantity: 1,
           maxQuantity: option.stockQuantity,
@@ -155,6 +200,7 @@ export function ProductSearchPopupClient({
       }
       setDone(true);
       setCart([]);
+      clearCart();
       toast.success("Köpet slutfördes och lagret uppdaterades.");
     } catch {
       toast.error("Något gick fel. Försök igen.");
@@ -184,18 +230,9 @@ export function ProductSearchPopupClient({
 
   return (
     <>
-      {!isOpen ? (
-        <button
-          type="button"
-          onClick={() => setIsOpen(true)}
-          className="min-h-11 w-full cursor-pointer rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm transition hover:border-blue-200 hover:text-blue-700"
-        >
-          Öppna sökresultat igen
-        </button>
-      ) : null}
 
       {isOpen ? (
-        <SearchInfoPopup products={products} onClose={handleClose} onAdd={addToCart} />
+        <SearchInfoPopup products={products} storeMetaLabels={storeMetaLabels} onClose={handleClose} onAdd={addToCart} />
       ) : null}
 
       {cartCount > 0 ? (
@@ -222,7 +259,7 @@ export function ProductSearchPopupClient({
           onClose={() => setCartOpen(false)}
           onCheckout={() => void checkout()}
           onRemove={(key) => setCart((prev) => prev.filter((i) => i.key !== key))}
-          onClear={() => { setCart([]); setCartOpen(false); }}
+          onClear={() => { setCart([]); clearCart(); setCartOpen(false); }}
           onChangeQty={(key, qty) =>
             setCart((prev) =>
               prev.flatMap((i) => {
@@ -392,10 +429,12 @@ function SökCartPanel({
 
 function SearchInfoPopup({
   products,
+  storeMetaLabels,
   onClose,
   onAdd,
 }: {
   products: SearchProduct[];
+  storeMetaLabels: Record<string, Record<string, string>>;
   onClose: () => void;
   onAdd: (product: SearchProduct, selectedKey: string) => void;
 }) {
@@ -438,6 +477,7 @@ function SearchInfoPopup({
             <SearchInfoCard
               key={product.id}
               product={product}
+              metaLabels={storeMetaLabels[product.storeId] ?? {}}
               onClose={onClose}
               onAdd={onAdd}
             />
@@ -450,13 +490,23 @@ function SearchInfoPopup({
 
 function SearchInfoCard({
   product,
+  metaLabels,
   onAdd,
 }: {
   product: SearchProduct;
+  metaLabels: Record<string, string>;
   onClose: () => void;
   onAdd: (product: SearchProduct, selectedKey: string) => void;
 }) {
   const allOptions = getProductOptions(product);
+  const metadata = asMetadataRecord(product.wooMetadata);
+  const metaEntries: [string, string][] = metadata
+    ? Object.entries(metadata).flatMap(([key, value]) => {
+        const label = metaLabels[key] ?? formatMetaKey(key);
+        const formatted = formatStoredMetaValue(value);
+        return formatted ? [[label, formatted] as [string, string]] : [];
+      })
+    : [];
   const inStockOptions = allOptions.filter((o) => o.stockQuantity > 0);
   const initialKey = (inStockOptions[0] ?? allOptions[0]).key;
   const [selectedKey, setSelectedKey] = useState(initialKey);
@@ -524,6 +574,9 @@ function SearchInfoCard({
         className={`mx-2.5 mb-2.5 overflow-hidden rounded-xl border text-xs ${outOfStock ? "border-red-200" : "border-[#dfd4c6]"}`}
       >
         <InfoBox label="Plats" value={selectedOption.stockLocation ?? "-"} outOfStock={outOfStock} />
+        {metaEntries.map(([label, value]) => (
+          <InfoBox key={label} label={label} value={value} outOfStock={outOfStock} />
+        ))}
       </div>
 
       {selectedOption.description ? (
@@ -647,6 +700,13 @@ function InfoBox({
       <p className={`max-w-28 wrap-break-word text-right font-bold ${outOfStock ? "text-zinc-400" : "text-blue-700"}`}>{value}</p>
     </div>
   );
+}
+
+function formatMetaKey(key: string): string {
+  return key
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/^\w/, (c) => c.toUpperCase());
 }
 
 function formatPrice(value: number): string {

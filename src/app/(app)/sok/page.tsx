@@ -4,13 +4,9 @@ import type {
   ProductVariant,
   Store,
 } from "@/generated/prisma/client";
-import { Suspense } from "react";
 import { auth } from "@/auth";
-import {
-  ProductSearchPopupClient,
-  type SearchProduct,
-} from "@/components/search/ProductSearchPopupClient";
-import { ProductSearch } from "@/components/products/ProductSearch";
+import type { SearchProduct } from "@/components/search/ProductSearchPopupClient";
+import { SökPageClient } from "@/app/(app)/sok/SökPageClient";
 import { prisma } from "@/lib/prisma";
 import {
   buildProductTaxonomyWhere,
@@ -24,6 +20,7 @@ type SökPageProps = {
     brand?: string;
     country?: string;
     storeId?: string;
+    _t?: string;
   }>;
 };
 
@@ -42,7 +39,7 @@ type NormalizedSearch = {
 
 export default async function SökPage({ searchParams }: SökPageProps) {
   const session = await auth();
-  const { q, category, brand, country, storeId } = await searchParams;
+  const { q, category, brand, country, storeId, _t } = await searchParams;
   const query = (q ?? "").trim();
   const search = normalizeSearch(query);
   const isAdmin = session?.user.role === "ADMIN";
@@ -70,7 +67,7 @@ export default async function SökPage({ searchParams }: SökPageProps) {
 
   const filterStoreId = storeId ?? undefined;
 
-  const searchToken = [query, category ?? "", brand ?? "", country ?? "", storeId ?? ""]
+  const searchToken = [query, category ?? "", brand ?? "", country ?? "", storeId ?? "", _t ?? ""]
     .join("|")
     .trim();
 
@@ -93,34 +90,31 @@ export default async function SökPage({ searchParams }: SökPageProps) {
       : Promise.resolve([]),
     prisma.store.findMany({
       orderBy: { name: "asc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, metaLabels: true },
     }),
     loadProductFilterOptions(filterStoreId),
   ]);
+
+  const storeMetaLabels = Object.fromEntries(
+    stores.map((s) => [s.id, (s.metaLabels ?? {}) as Record<string, string>]),
+  );
 
   return (
     <section className="flex flex-col gap-4">
       <SearchHeader productCount={products.length} query={query} />
 
-      <Suspense>
-        <ProductSearch
-          basePath="/sok"
-          submitOnButtonOnly
-          showStoreFilter={stores.length > 1}
-          stores={stores}
-          filterOptions={filterOptions}
-          initialQuery={query}
-          initialStoreId={storeId ?? ""}
-          initialCategory={category ?? ""}
-          initialBrand={brand ?? ""}
-          initialCountry={country ?? ""}
-        />
-      </Suspense>
-
-      <ProductSearchPopupClient
+      <SökPageClient
         products={serializeSearchProducts(products)}
         hasQuery={hasFilters}
         searchToken={searchToken || "_"}
+        stores={stores}
+        filterOptions={filterOptions}
+        storeMetaLabels={storeMetaLabels}
+        initialQuery={query}
+        initialStoreId={storeId ?? ""}
+        initialCategory={category ?? ""}
+        initialBrand={brand ?? ""}
+        initialCountry={country ?? ""}
       />
     </section>
   );
@@ -174,6 +168,7 @@ function serializeSearchProducts(
     shortDescription: product.shortDescription,
     stockQuantity: product.stockQuantity,
     stockLocation: product.stockLocation,
+    wooMetadata: (product.wooMetadata ?? null) as Record<string, unknown> | null,
     variants: product.variants.map((variant) => ({
       id: variant.id,
       name: variant.name,

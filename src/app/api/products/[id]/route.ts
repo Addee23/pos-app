@@ -94,15 +94,31 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const data = parsed.data;
-    const updates: Prisma.ProductUpdateInput = {
+    const candidate = {
       price: data.price,
+      sku: data.sku,
       ean: data.ean,
       stockQuantity: data.stockQuantity,
       stockLocation: data.stockLocation,
-      category: data.category,
-      brand: data.brand,
-      country: data.country,
     };
+
+    const updates = Object.fromEntries(
+      Object.entries(candidate).filter(
+        ([key, value]) =>
+          String(value ?? "") !== String(existing[key as keyof typeof existing] ?? ""),
+      ),
+    ) as Prisma.ProductUpdateInput;
+
+    if (Object.keys(updates).length === 0) {
+      const product = await prisma.product.findUnique({
+        where: { id },
+        include: {
+          store: { select: { id: true, name: true } },
+          variants: { orderBy: { name: "asc" } },
+        },
+      });
+      return NextResponse.json(product);
+    }
 
     const product = await prisma.product.update({
       where: { id },
@@ -113,29 +129,16 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
     });
 
-    const fields = [
-      "price",
-      "ean",
-      "stockQuantity",
-      "stockLocation",
-      "category",
-      "brand",
-      "country",
-    ] as const;
-    for (const field of fields) {
-      const oldVal = String(existing[field] ?? "");
-      const newVal = String(product[field] ?? "");
-      if (oldVal !== newVal) {
-        await createAuditLog({
-          userId: session.user.id,
-          storeId: product.storeId,
-          entityType: "Product",
-          entityId: product.id,
-          field,
-          oldValue: oldVal,
-          newValue: newVal,
-        });
-      }
+    for (const [field, newValue] of Object.entries(updates)) {
+      await createAuditLog({
+        userId: session.user.id,
+        storeId: product.storeId,
+        entityType: "Product",
+        entityId: product.id,
+        field,
+        oldValue: String(existing[field as keyof typeof existing] ?? ""),
+        newValue: String(newValue ?? ""),
+      });
     }
 
     return NextResponse.json(product);

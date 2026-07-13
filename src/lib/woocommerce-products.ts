@@ -9,6 +9,7 @@ import { extractWooProductMetadata, formatStoredMetaValue } from "@/lib/woo-prod
 import { normalizeBrand } from "@/lib/product-taxonomy-options";
 
 const BRAND_META_KEYS = ["varumärke", "varumarke", "brand", "marke"];
+const EAN_META_KEYS = ["_ean", "ean", "gtin", "barcode", "woo_product_ean", "_gtin"];
 
 export type WooProductImportInput = {
   products: unknown[];
@@ -23,6 +24,7 @@ export type ImportedWooProduct = {
   permalink: string | null;
   productType: ProductType;
   price: string;
+  sku: string | null;
   ean: string | null;
   stockQuantity: number;
   imageUrl: string | null;
@@ -41,6 +43,7 @@ export type ImportedWooVariant = {
   wooVariantId: number;
   name: string;
   price: string;
+  sku: string | null;
   ean: string | null;
   stockQuantity: number;
   imageUrl: string | null;
@@ -87,10 +90,7 @@ export async function normalizeWooProducts({
 
     // Produkter med flera kategorier är tillbehör — de ska inte ha ursprungsland.
     const isAccessory = asArray(product.categories).length > 1;
-    const country = isAccessory
-      ? null
-      : extractWooCountry(product) ??
-        inferProductTaxonomy({ name, shortDescription, brand }).country;
+    const country = isAccessory ? null : extractWooCountry(product) ?? null;
 
     normalized.push({
       wooProductId,
@@ -99,7 +99,8 @@ export async function normalizeWooProducts({
       permalink: asString(product.permalink) || null,
       productType,
       price: normalizePrice(product.price),
-      ean: asString(product.sku) || null,
+      sku: asString(product.sku) || null,
+      ean: extractEanFromMeta(product),
       stockQuantity: normalizeStock(product.stock_quantity),
       imageUrl: firstImageUrl(product),
       metaDescription: seoMetaDescription(product),
@@ -109,6 +110,8 @@ export async function normalizeWooProducts({
       country,
       wooMetadata: {
         ...(brand ? { brand } : {}),
+        ...(category ? { category } : {}),
+        ...(country ? { country } : {}),
         ...wooMeta,
       },
       variants: variationDetails.map((variant, index) =>
@@ -173,7 +176,8 @@ function normalizeVariant(
       variationNameFromAttributes(product, index) ||
       `Variant ${index + 1}`,
     price: normalizePrice(variant.price || product.price),
-    ean: asString(variant.sku) || null,
+    sku: asString(variant.sku) || null,
+    ean: extractEanFromMeta(variant) ?? extractEanFromMeta(product),
     stockQuantity: normalizeStock(variant.stock_quantity),
     imageUrl: firstImageUrl(variant) ?? firstImageUrl(product),
     metaDescription:
@@ -250,6 +254,18 @@ function asObject(value: unknown): WooObject | null {
 
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
+}
+
+function extractEanFromMeta(product: WooObject): string | null {
+  const metaData = asArray(product.meta_data).map(asObject);
+  for (const metaKey of EAN_META_KEYS) {
+    const entry = metaData.find((m) => m && asString(m.key).toLowerCase() === metaKey);
+    if (entry) {
+      const value = asString(entry.value).trim();
+      if (value) return value;
+    }
+  }
+  return null;
 }
 
 function extractBrandFromMeta(meta: Record<string, unknown>): string | null {

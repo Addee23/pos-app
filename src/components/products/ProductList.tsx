@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { ProductActions } from "@/components/products/ProductActions";
+import { asMetadataRecord, formatStoredMetaValue } from "@/lib/woo-product-metadata";
+
 
 export type SerializedVariant = {
   id: string;
   wooVariantId: number;
   name: string;
   price: string;
+  sku: string | null;
   ean: string | null;
   imageUrl: string | null;
   metaDescription: string | null;
@@ -24,6 +27,7 @@ export type ProductWithRelations = {
   permalink: string | null;
   productType: "SIMPLE" | "VARIABLE";
   price: string;
+  sku: string | null;
   ean: string | null;
   imageUrl: string | null;
   metaDescription: string | null;
@@ -33,15 +37,18 @@ export type ProductWithRelations = {
   country: string | null;
   stockQuantity: number;
   stockLocation: string | null;
+  wooMetadata: Record<string, unknown> | null;
   store: { id: string; name: string };
   variants: SerializedVariant[];
 };
 
 type ProductListProps = {
   products: ProductWithRelations[];
+  /** metaLabels per butik: { [storeId]: { [wooKey]: label } } */
+  storeMetaLabels?: Record<string, Record<string, string>>;
 };
 
-export function ProductList({ products }: ProductListProps) {
+export function ProductList({ products, storeMetaLabels = {} }: ProductListProps) {
   const [selected, setSelected] = useState<ProductWithRelations | null>(null);
 
   if (products.length === 0) {
@@ -67,7 +74,7 @@ export function ProductList({ products }: ProductListProps) {
               }`}
               onClick={() => setSelected(product)}
             >
-              <ProductCard product={product} />
+              <ProductCard product={product} metaLabels={storeMetaLabels[product.store.id] ?? {}} />
               <div
                 className={`border-t px-2.5 pb-2.5 pt-2 ${outOfStock ? "border-red-200" : "border-[#dfd4c6]"}`}
                 onClick={(e) => e.stopPropagation()}
@@ -85,6 +92,7 @@ export function ProductList({ products }: ProductListProps) {
       {selected ? (
         <ProductDetailModal
           product={selected}
+          metaLabels={storeMetaLabels[selected.store.id] ?? {}}
           onClose={() => setSelected(null)}
         />
       ) : null}
@@ -94,12 +102,22 @@ export function ProductList({ products }: ProductListProps) {
 
 function ProductDetailModal({
   product,
+  metaLabels,
   onClose,
 }: {
   product: ProductWithRelations;
+  metaLabels: Record<string, string>;
   onClose: () => void;
 }) {
   const outOfStock = isOutOfStock(product);
+  const metadata = asMetadataRecord(product.wooMetadata);
+  const metaEntries: [string, string][] = metadata
+    ? Object.entries(metadata).flatMap(([key, value]) => {
+        const label = metaLabels[key] ?? formatMetaKey(key);
+        const formatted = formatStoredMetaValue(value);
+        return formatted ? [[label, formatted] as [string, string]] : [];
+      })
+    : [];
   const isVariable = product.productType === "VARIABLE";
   const inStockVariants = isVariable ? product.variants.filter((v) => v.stockQuantity > 0) : [];
 
@@ -157,9 +175,11 @@ function ProductDetailModal({
 
         <div className="mt-3 overflow-hidden rounded-xl border border-[#dfd4c6] text-xs">
           <InfoRow label="Plats" value={product.stockLocation ?? "-"} />
-          {product.category ? <InfoRow label="Kategori" value={product.category} /> : null}
-          {product.brand ? <InfoRow label="Varumärke" value={product.brand} /> : null}
-          {product.country ? <InfoRow label="Land" value={product.country} /> : null}
+          {product.sku ? <InfoRow label="SKU" value={product.sku} /> : null}
+          {product.ean ? <InfoRow label="EAN" value={product.ean} /> : null}
+          {metaEntries.map(([label, value]) => (
+            <InfoRow key={label} label={label} value={value} />
+          ))}
         </div>
 
         {product.shortDescription ? (
@@ -204,7 +224,13 @@ function isOutOfStock(product: ProductWithRelations): boolean {
   return product.stockQuantity <= 0;
 }
 
-function ProductCard({ product }: { product: ProductWithRelations }) {
+function ProductCard({
+  product,
+  metaLabels,
+}: {
+  product: ProductWithRelations;
+  metaLabels: Record<string, string>;
+}) {
   const isVariable = product.productType === "VARIABLE";
   const inStockVariants = isVariable
     ? product.variants.filter((v) => v.stockQuantity > 0)
@@ -214,6 +240,14 @@ function ProductCard({ product }: { product: ProductWithRelations }) {
   );
   const [showDescription, setShowDescription] = useState(false);
 
+  const metadata = asMetadataRecord(product.wooMetadata);
+  const metaEntries: [string, string][] = metadata
+    ? Object.entries(metadata).flatMap(([key, value]) => {
+        const label = metaLabels[key] ?? formatMetaKey(key);
+        const formatted = formatStoredMetaValue(value);
+        return formatted ? [[label, formatted] as [string, string]] : [];
+      })
+    : [];
   const selectedVariant = selectedVariantId
     ? (product.variants.find((v) => v.id === selectedVariantId) ?? null)
     : null;
@@ -263,7 +297,7 @@ function ProductCard({ product }: { product: ProductWithRelations }) {
           {product.name}
         </p>
         <p className={`mt-0.5 text-[10px] font-semibold ${outOfStock ? "text-zinc-400" : "text-orange-700"}`}>
-          {selectedVariant ? selectedVariant.name : product.store.name}
+          {product.store.name}
         </p>
         <p className={`mt-0.5 text-sm font-bold ${outOfStock ? "text-zinc-400" : "text-[#43342c]"}`}>
           {formatPrice(displayPrice)} kr
@@ -275,6 +309,9 @@ function ProductCard({ product }: { product: ProductWithRelations }) {
 
       <div className={`mx-2.5 mb-2.5 overflow-hidden rounded-xl border text-xs ${outOfStock ? "border-red-200" : "border-[#dfd4c6]"}`}>
         <InfoBox label="Plats" value={displayLocation ?? "-"} outOfStock={outOfStock} />
+        {metaEntries.map(([label, value]) => (
+          <InfoBox key={label} label={label} value={value} outOfStock={outOfStock} />
+        ))}
       </div>
 
       {displayDescription ? (
@@ -379,6 +416,13 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+
+function formatMetaKey(key: string): string {
+  return key
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
 
 function formatPrice(value: string): string {
   return Number(value).toFixed(2);

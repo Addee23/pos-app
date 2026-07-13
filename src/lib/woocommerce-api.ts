@@ -117,6 +117,7 @@ async function wooApiPut(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
     cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!response.ok) {
@@ -135,7 +136,7 @@ async function wooApiGet(
   query: Record<string, string> = {},
 ): Promise<unknown> {
   const url = buildWooApiUrl(store, path, query);
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(30_000) });
 
   if (!response.ok) {
     const body = await response.text();

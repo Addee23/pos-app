@@ -60,7 +60,7 @@ export default async function AdminProductsPage({
   const [stores, totalProducts, filterOptions, products, rawStoreCounts] = await Promise.all([
     prisma.store.findMany({
       orderBy: { name: "asc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, metaLabels: true },
     }),
     prisma.product.count({ where }),
     loadProductFilterOptions(storeId),
@@ -79,6 +79,13 @@ export default async function AdminProductsPage({
 
   const storeCountMap = Object.fromEntries(
     rawStoreCounts.map((row) => [row.storeId, row._count.id]),
+  );
+
+  const storeMetaLabels = Object.fromEntries(
+    stores.map((s) => [
+      s.id,
+      (s.metaLabels ?? {}) as Record<string, string>,
+    ]),
   );
 
   const totalPages = Math.max(1, Math.ceil(totalProducts / PRODUCTS_PER_PAGE));
@@ -106,37 +113,43 @@ export default async function AdminProductsPage({
         />
       </Suspense>
       <ProductUpdateTools storeId={storeId ?? ""} />
-      <ProductList products={products.map((p) => ({
-        id: p.id,
-        wooProductId: p.wooProductId,
-        name: p.name,
-        slug: p.slug,
-        permalink: p.permalink,
-        productType: p.productType,
-        price: p.price.toString(),
-        ean: p.ean,
-        imageUrl: p.imageUrl,
-        metaDescription: p.metaDescription,
-        shortDescription: p.shortDescription,
-        category: p.category,
-        brand: p.brand,
-        country: p.country,
-        stockQuantity: p.stockQuantity,
-        stockLocation: p.stockLocation,
-        store: p.store,
-        variants: p.variants.map((v) => ({
-          id: v.id,
-          wooVariantId: v.wooVariantId,
-          name: v.name,
-          price: v.price.toString(),
-          ean: v.ean,
-          imageUrl: v.imageUrl,
-          metaDescription: v.metaDescription,
-          shortDescription: v.shortDescription,
-          stockQuantity: v.stockQuantity,
-          stockLocation: v.stockLocation,
-        })),
-      }))} />
+      <ProductList
+        storeMetaLabels={storeMetaLabels}
+        products={products.map((p) => ({
+          id: p.id,
+          wooProductId: p.wooProductId,
+          name: p.name,
+          slug: p.slug,
+          permalink: p.permalink,
+          productType: p.productType,
+          price: p.price.toString(),
+          sku: p.sku,
+          ean: p.ean,
+          imageUrl: p.imageUrl,
+          metaDescription: p.metaDescription,
+          shortDescription: p.shortDescription,
+          category: p.category,
+          brand: p.brand,
+          country: p.country,
+          stockQuantity: p.stockQuantity,
+          stockLocation: p.stockLocation,
+          wooMetadata: (p.wooMetadata ?? null) as Record<string, unknown> | null,
+          store: p.store,
+          variants: p.variants.map((v) => ({
+            id: v.id,
+            wooVariantId: v.wooVariantId,
+            name: v.name,
+            price: v.price.toString(),
+            ean: v.ean,
+            imageUrl: v.imageUrl,
+            metaDescription: v.metaDescription,
+            shortDescription: v.shortDescription,
+            stockQuantity: v.stockQuantity,
+            sku: v.sku,
+            stockLocation: v.stockLocation,
+          })),
+        }))}
+      />
       <ProductPagination
         currentPage={currentPage}
         pageSize={PRODUCTS_PER_PAGE}
