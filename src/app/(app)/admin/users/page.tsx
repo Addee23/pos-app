@@ -10,16 +10,23 @@ export default async function AdminUsersPage() {
     redirect("/kassa");
   }
 
-  const users = await prisma.user.findMany({
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      createdAt: true,
-    },
-    orderBy: [{ role: "asc" }, { name: "asc" }],
-  });
+  const [users, stores] = await Promise.all([
+    prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        createdAt: true,
+        stores: { select: { store: { select: { id: true, name: true } } } },
+      },
+      orderBy: [{ role: "asc" }, { name: "asc" }],
+    }),
+    prisma.store.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
   const adminCount = users.filter((user) => user.role === "ADMIN").length;
   const personalCount = users.filter((user) => user.role === "PERSONAL").length;
@@ -60,7 +67,9 @@ export default async function AdminUsersPage() {
           name: user.name,
           role: user.role,
           createdAt: user.createdAt.toISOString(),
+          stores: user.stores.map((s) => s.store),
         }))}
+        allStores={stores}
         currentUserId={session.user.id}
       />
     </section>

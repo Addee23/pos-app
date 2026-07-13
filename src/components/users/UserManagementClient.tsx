@@ -5,28 +5,34 @@ import { useRef, useState } from "react";
 import type { Role } from "@/generated/prisma/client";
 import { useToast } from "@/components/ui/ToastProvider";
 
+type StoreRef = { id: string; name: string };
+
 type ManagedUser = {
   id: string;
   email: string;
   name: string;
   role: Role;
   createdAt: string;
+  stores: StoreRef[];
 };
 
 type UserPayload = {
   name: string;
   role: Role;
+  storeIds?: string[];
 };
 
 type RoleFilter = "ALL" | "ADMIN" | "PERSONAL";
 
 type UserManagementClientProps = {
   initialUsers: ManagedUser[];
+  allStores: StoreRef[];
   currentUserId: string;
 };
 
 export function UserManagementClient({
   initialUsers,
+  allStores,
   currentUserId,
 }: UserManagementClientProps) {
   const router = useRouter();
@@ -72,6 +78,7 @@ export function UserManagementClient({
         name: data.name,
         role: data.role,
         createdAt: data.createdAt,
+        stores: data.stores ?? [],
       };
       setUsers((prev) => [...prev, newUser]);
       setShowCreate(false);
@@ -101,6 +108,7 @@ export function UserManagementClient({
         name: data.name,
         role: data.role,
         createdAt: data.createdAt,
+        stores: data.stores ?? [],
       };
       setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
       setEditingId(null);
@@ -172,6 +180,7 @@ export function UserManagementClient({
             <UserRow
               key={user.id}
               user={user}
+              allStores={allStores}
               currentUserId={currentUserId}
               isExpanded={expandedId === user.id}
               isEditing={editingId === user.id}
@@ -191,6 +200,7 @@ export function UserManagementClient({
       {showCreate ? (
         <CreateUserPopup
           creating={creating}
+          allStores={allStores}
           onClose={() => setShowCreate(false)}
           onSubmit={createUser}
         />
@@ -201,6 +211,7 @@ export function UserManagementClient({
 
 function UserRow({
   user,
+  allStores,
   currentUserId,
   isExpanded,
   isEditing,
@@ -211,6 +222,7 @@ function UserRow({
   onSave,
 }: {
   user: ManagedUser;
+  allStores: StoreRef[];
   currentUserId: string;
   isExpanded: boolean;
   isEditing: boolean;
@@ -264,6 +276,10 @@ function UserRow({
                 <InfoPill label="Roll" value={user.role === "ADMIN" ? "Admin" : "Personal"} />
                 <InfoPill label="E-post" value={user.email} />
                 <InfoPill label="Skapad" value={formatDate(user.createdAt)} />
+                <InfoPill
+                  label="Butiker"
+                  value={user.stores.length === 0 ? "Ingen tillgång" : user.stores.map((s) => s.name).join(", ")}
+                />
               </div>
               <button
                 type="button"
@@ -276,6 +292,7 @@ function UserRow({
           ) : (
             <UserEditForm
               user={user}
+              allStores={allStores}
               currentUserId={currentUserId}
               isSaving={isSaving}
               onCancel={onCancelEdit}
@@ -290,12 +307,14 @@ function UserRow({
 
 function UserEditForm({
   user,
+  allStores,
   currentUserId,
   isSaving,
   onCancel,
   onSave,
 }: {
   user: ManagedUser;
+  allStores: StoreRef[];
   currentUserId: string;
   isSaving: boolean;
   onCancel: () => void;
@@ -303,10 +322,11 @@ function UserEditForm({
 }) {
   const [name, setName] = useState(user.name);
   const [role, setRole] = useState<Role>(user.role);
+  const [storeIds, setStoreIds] = useState<string[]>(user.stores.map((s) => s.id));
 
   function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
-    onSave({ name, role });
+    onSave({ name, role, storeIds });
   }
 
   return (
@@ -317,6 +337,7 @@ function UserEditForm({
         onChange={setRole}
         disabled={user.id === currentUserId}
       />
+      <StoreCheckboxList allStores={allStores} selected={storeIds} onChange={setStoreIds} />
       <div className="flex gap-2">
         <button
           type="button"
@@ -339,10 +360,12 @@ function UserEditForm({
 
 function CreateUserPopup({
   creating,
+  allStores,
   onClose,
   onSubmit,
 }: {
   creating: boolean;
+  allStores: StoreRef[];
   onClose: () => void;
   onSubmit: (payload: UserPayload & { email: string; password: string }) => void;
 }) {
@@ -350,10 +373,11 @@ function CreateUserPopup({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("PERSONAL");
+  const [storeIds, setStoreIds] = useState<string[]>([]);
 
   function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
-    onSubmit({ email, name, password, role });
+    onSubmit({ email, name, password, role, storeIds });
   }
 
   return (
@@ -381,6 +405,7 @@ function CreateUserPopup({
           <CompactField label="E-post" value={email} onChange={setEmail} type="email" placeholder="anna@butik.se" autoComplete="email" />
           <CompactField label="Lösenord" value={password} onChange={setPassword} type="password" placeholder="Minst 6 tecken" autoComplete="new-password" />
           <CompactRoleSelect value={role} onChange={setRole} />
+          <StoreCheckboxList allStores={allStores} selected={storeIds} onChange={setStoreIds} />
           <button
             type="submit"
             disabled={creating}
@@ -391,6 +416,85 @@ function CreateUserPopup({
         </form>
       </section>
     </div>
+  );
+}
+
+function StoreCheckboxList({
+  allStores,
+  selected,
+  onChange,
+}: {
+  allStores: StoreRef[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  if (allStores.length === 0) return null;
+
+  function toggle(id: string) {
+    onChange(
+      selected.includes(id)
+        ? selected.filter((s) => s !== id)
+        : [...selected, id],
+    );
+  }
+
+  const allSelected = allStores.every((s) => selected.includes(s.id));
+
+  return (
+    <fieldset className="flex flex-col gap-1.5">
+      <legend className="text-xs font-semibold text-zinc-600">Butikstillgång</legend>
+      <div className="flex flex-col gap-1 rounded-lg border border-zinc-200 p-2">
+        <label
+          className="flex cursor-pointer items-center gap-2.5 rounded-md border-b border-zinc-100 px-2 py-1.5 pb-2.5 mb-0.5 transition hover:bg-zinc-50"
+          onClick={() => onChange(allSelected ? [] : allStores.map((s) => s.id))}
+        >
+          <span
+            className={`flex size-4 shrink-0 items-center justify-center rounded border transition ${
+              allSelected
+                ? "border-violet-600 bg-violet-600"
+                : "border-zinc-300 bg-white"
+            }`}
+          >
+            {allSelected ? (
+              <svg className="size-2.5 text-white" viewBox="0 0 10 10" fill="none">
+                <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : null}
+          </span>
+          <span className="text-sm font-semibold text-zinc-800">Alla butiker</span>
+        </label>
+        {allStores.map((store) => {
+          const checked = selected.includes(store.id);
+          return (
+            <label
+              key={store.id}
+              className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition hover:bg-zinc-50"
+            >
+              <span
+                className={`flex size-4 shrink-0 items-center justify-center rounded border transition ${
+                  checked
+                    ? "border-violet-600 bg-violet-600"
+                    : "border-zinc-300 bg-white"
+                }`}
+              >
+                {checked ? (
+                  <svg className="size-2.5 text-white" viewBox="0 0 10 10" fill="none">
+                    <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ) : null}
+              </span>
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={checked}
+                onChange={() => toggle(store.id)}
+              />
+              <span className="text-sm text-zinc-800">{store.name}</span>
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }
 

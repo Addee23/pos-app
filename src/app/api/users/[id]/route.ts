@@ -51,7 +51,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
-    const existingUser = await prisma.user.findUnique({ where: { id }, select: { id: true } });
+    const existingUser = await prisma.user.findUnique({ where: { id }, select: { id: true, name: true, role: true } });
 
     if (!existingUser) {
       return NextResponse.json(
@@ -60,22 +60,28 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
+    const scalarUpdates: Record<string, unknown> = {};
+    if (parsed.data.name !== existingUser.name) scalarUpdates.name = parsed.data.name;
+    if (parsed.data.role !== existingUser.role) scalarUpdates.role = parsed.data.role;
+
+    const storeUpdate = parsed.data.storeIds !== undefined
+      ? { stores: { deleteMany: {}, create: parsed.data.storeIds.map((storeId) => ({ storeId })) } }
+      : {};
+
     const user = await prisma.user.update({
       where: { id },
-      data: {
-        name: parsed.data.name,
-        role: parsed.data.role,
-      },
+      data: { ...scalarUpdates, ...storeUpdate },
       select: {
         id: true,
         email: true,
         name: true,
         role: true,
         createdAt: true,
+        stores: { select: { store: { select: { id: true, name: true } } } },
       },
     });
 
-    return NextResponse.json(user);
+    return NextResponse.json({ ...user, stores: user.stores.map((s) => s.store) });
   } catch (error) {
     console.error(error);
     return NextResponse.json(

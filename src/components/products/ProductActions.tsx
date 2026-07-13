@@ -20,15 +20,15 @@ export function ProductActions({
   const toast = useToast();
   const [deleting, setDeleting] = useState(false);
 
-  async function handleDelete() {
-    const confirmed = window.confirm(
-      `Ta bort "${productName}"?\n\nProdukten försvinner från katalogen. Historik i försäljning och upphämtning behålls utan koppling till produkten.`,
+  function handleDelete() {
+    toast.confirm(
+      `Ta bort "${productName}"? Produkten försvinner från katalogen. Historik i försäljning och upphämtning behålls.`,
+      () => void doDelete(),
+      { confirmLabel: "Ja, ta bort", cancelLabel: "Avbryt" },
     );
+  }
 
-    if (!confirmed) {
-      return;
-    }
-
+  async function doDelete() {
     setDeleting(true);
 
     try {
