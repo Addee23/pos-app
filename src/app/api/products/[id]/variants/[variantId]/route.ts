@@ -59,31 +59,40 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const data = parsed.data;
+    const candidate = {
+      price: data.price,
+      sku: data.sku,
+      ean: data.ean,
+      stockQuantity: data.stockQuantity,
+      stockLocation: data.stockLocation,
+    };
+
+    const updates = Object.fromEntries(
+      Object.entries(candidate).filter(
+        ([key, value]) =>
+          String(value ?? "") !== String(existing[key as keyof typeof existing] ?? ""),
+      ),
+    );
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json(existing);
+    }
+
     const variant = await prisma.productVariant.update({
       where: { id: variantId },
-      data: {
-        price: data.price,
-        ean: data.ean,
-        stockQuantity: data.stockQuantity,
-        stockLocation: data.stockLocation,
-      },
+      data: updates,
     });
 
-    const fields = ["price", "ean", "stockQuantity", "stockLocation"] as const;
-    for (const field of fields) {
-      const oldVal = String(existing[field] ?? "");
-      const newVal = String(variant[field] ?? "");
-      if (oldVal !== newVal) {
-        await createAuditLog({
-          userId: session.user.id,
-          storeId: existing.product.storeId,
-          entityType: "ProductVariant",
-          entityId: variant.id,
-          field,
-          oldValue: oldVal,
-          newValue: newVal,
-        });
-      }
+    for (const [field, newValue] of Object.entries(updates)) {
+      await createAuditLog({
+        userId: session.user.id,
+        storeId: existing.product.storeId,
+        entityType: "ProductVariant",
+        entityId: variant.id,
+        field,
+        oldValue: String(existing[field as keyof typeof existing] ?? ""),
+        newValue: String(newValue ?? ""),
+      });
     }
 
     return NextResponse.json(variant);

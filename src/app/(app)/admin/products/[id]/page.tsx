@@ -9,6 +9,7 @@ import {
   ProductEditForm,
   type EditableProduct,
 } from "@/components/products/ProductEditForm";
+import { asMetadataRecord, formatStoredMetaValue } from "@/lib/woo-product-metadata";
 
 type ProductDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -27,7 +28,7 @@ export default async function ProductDetailPage({
   const product = await prisma.product.findUnique({
     where: { id },
     include: {
-      store: { select: { name: true } },
+      store: { select: { name: true, metaLabels: true } },
       variants: { orderBy: { name: "asc" } },
     },
   });
@@ -58,17 +59,16 @@ export default async function ProductDetailPage({
     name: product.name,
     slug: product.slug,
     price: Number(product.price),
+    sku: product.sku,
     ean: product.ean,
     stockQuantity: product.stockQuantity,
     stockLocation: product.stockLocation,
-    category: product.category,
-    brand: product.brand,
-    country: product.country,
     variants: product.variants.map((variant) => ({
       id: variant.id,
       wooVariantId: variant.wooVariantId,
       name: variant.name,
       price: Number(variant.price),
+      sku: variant.sku,
       ean: variant.ean,
       stockQuantity: variant.stockQuantity,
       stockLocation: variant.stockLocation,
@@ -107,9 +107,9 @@ export default async function ProductDetailPage({
         <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
           <MetaItem label="Woo ID" value={String(product.wooProductId)} />
           <MetaItem label="Typ" value={product.productType} />
-          <MetaItem label="Kategori" value={product.category ?? "-"} />
-          <MetaItem label="Varumärke" value={product.brand ?? "-"} />
-          <MetaItem label="Land" value={product.country ?? "-"} />
+          {metaEntries(product.wooMetadata, product.store.metaLabels).map(([label, value]) => (
+            <MetaItem key={label} label={label} value={value} />
+          ))}
           <MetaItem label="Slug" value={product.slug} wide />
           <MetaItem label="Permalink" value={product.permalink ?? "-"} wide />
         </dl>
@@ -154,6 +154,32 @@ function ProductImage({
   );
 }
 
+function metaEntries(
+  wooMetadata: unknown,
+  storeMetaLabels: unknown,
+): [string, string][] {
+  const metadata = asMetadataRecord(wooMetadata);
+  if (!metadata) return [];
+  const labels =
+    typeof storeMetaLabels === "object" &&
+    storeMetaLabels !== null &&
+    !Array.isArray(storeMetaLabels)
+      ? (storeMetaLabels as Record<string, string>)
+      : {};
+  return Object.entries(metadata).flatMap(([key, value]) => {
+    const label = labels[key] ?? formatMetaKey(key);
+    const formatted = formatStoredMetaValue(value);
+    return formatted ? [[label, formatted] as [string, string]] : [];
+  });
+}
+
+function formatMetaKey(key: string): string {
+  return key
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
+
 function MetaItem({
   label,
   value,
@@ -166,7 +192,7 @@ function MetaItem({
   return (
     <div className={wide ? "col-span-2" : undefined}>
       <dt className="text-xs font-medium text-zinc-400">{label}</dt>
-      <dd className="mt-0.5 break-words text-zinc-800">{value}</dd>
+      <dd className="mt-0.5 wrap-break-word text-zinc-800">{value}</dd>
     </div>
   );
 }

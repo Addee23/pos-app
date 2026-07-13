@@ -35,6 +35,8 @@ type ProductSearchProps = {
   initialCategory?: string;
   initialBrand?: string;
   initialCountry?: string;
+  /** Anropas när draft-filter ändras (submitOnButtonOnly-läge). */
+  onDraftChange?: () => void;
 };
 
 type ActiveFilter = {
@@ -54,6 +56,7 @@ export function ProductSearch({
   initialCategory = "",
   initialBrand = "",
   initialCountry = "",
+  onDraftChange,
 }: ProductSearchProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -68,6 +71,26 @@ export function ProductSearch({
     country: initialCountry,
     storeId: initialStoreId,
   });
+  const [dynamicOptions, setDynamicOptions] = useState<typeof filterOptions>(filterOptions);
+
+  useEffect(() => {
+    setDynamicOptions(filterOptions);
+  }, [filterOptions]);
+
+  async function fetchOptions(storeId: string) {
+    const url = storeId
+      ? `/api/products/filter-options?storeId=${encodeURIComponent(storeId)}`
+      : "/api/products/filter-options";
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = (await res.json()) as typeof filterOptions;
+        setDynamicOptions(data);
+      }
+    } catch {
+      // behåll befintliga alternativ vid fel
+    }
+  }
   const [filtersOpen, setFiltersOpen] = useState(
     Boolean(initialBrand || initialCountry || initialStoreId || initialCategory),
   );
@@ -149,10 +172,10 @@ export function ProductSearch({
     if (draft.storeId) {
       params.set("storeId", draft.storeId);
     }
+    params.set("_t", String(Date.now()));
 
     startTransition(() => {
-      const queryString = params.toString();
-      router.push(queryString ? `${basePath}?${queryString}` : basePath);
+      router.push(`${basePath}?${params.toString()}`);
     });
   }
 
@@ -161,6 +184,7 @@ export function ProductSearch({
       ...current,
       [key]: current[key] === value ? "" : value,
     }));
+    if (submitOnButtonOnly) onDraftChange?.();
   }
 
   function toggleParam(key: string, value: string, current: string) {
@@ -241,6 +265,29 @@ export function ProductSearch({
 
   return (
     <section className="relative sticky top-[73px] z-30 space-y-3 rounded-2xl border border-zinc-200/70 bg-white/95 p-3 shadow-sm backdrop-blur-md">
+      {showStoreFilter && stores.length > 1 ? (
+        <select
+          value={chipFilters.storeId}
+          disabled={pending}
+          onChange={(e) => {
+            const val = e.target.value;
+            void fetchOptions(val);
+            if (submitOnButtonOnly) {
+              setDraft((current) => ({ ...current, storeId: val, category: "", brand: "", country: "" }));
+              onDraftChange?.();
+            } else {
+              navigate({ storeId: val || null, category: null, brand: null, country: null });
+            }
+          }}
+          className="h-9 w-full cursor-pointer rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-xs font-semibold text-zinc-700 outline-none focus:border-zinc-400 disabled:opacity-50"
+        >
+          <option value="">Alla butiker</option>
+          {stores.map((store) => (
+            <option key={store.id} value={store.id}>{store.name}</option>
+          ))}
+        </select>
+      ) : null}
+
       <div className="flex items-center gap-2">
         <label className="group relative min-w-0 flex-1">
           <span className="sr-only">Sök produkter</span>
@@ -317,9 +364,9 @@ export function ProductSearch({
 
       {filtersOpen ? (
         <div className="space-y-3 rounded-xl border border-zinc-100 bg-zinc-50/80 p-3">
-          {filterOptions.categories.length > 0 ? (
+          {dynamicOptions.categories.length > 0 ? (
             <FilterRow label="Kategori">
-              {filterOptions.categories.map((category) => (
+              {dynamicOptions.categories.map((category) => (
                 <FilterChip
                   key={category}
                   label={category}
@@ -335,9 +382,9 @@ export function ProductSearch({
             </FilterRow>
           ) : null}
 
-          {filterOptions.brands.length > 0 ? (
+          {dynamicOptions.brands.length > 0 ? (
             <FilterRow label="Varumärke">
-              {filterOptions.brands.map((brand) => (
+              {dynamicOptions.brands.map((brand) => (
                 <FilterChip
                   key={brand}
                   label={brand}
@@ -354,9 +401,9 @@ export function ProductSearch({
             </FilterRow>
           ) : null}
 
-          {filterOptions.countries.length > 0 ? (
+          {dynamicOptions.countries.length > 0 ? (
             <FilterRow label="Land">
-              {filterOptions.countries.map((country) => (
+              {dynamicOptions.countries.map((country) => (
                 <FilterChip
                   key={country}
                   label={country}
@@ -373,33 +420,6 @@ export function ProductSearch({
             </FilterRow>
           ) : null}
 
-          {showStoreFilter && stores.length > 0 ? (
-            <FilterRow label="Butik">
-              <FilterChip
-                label="Alla butiker"
-                selected={!chipFilters.storeId}
-                pending={pending}
-                onClick={() =>
-                  submitOnButtonOnly
-                    ? setDraft((current) => ({ ...current, storeId: "" }))
-                    : navigate({ storeId: null })
-                }
-              />
-              {stores.map((store) => (
-                <FilterChip
-                  key={store.id}
-                  label={store.name}
-                  selected={chipFilters.storeId === store.id}
-                  pending={pending}
-                  onClick={() =>
-                    submitOnButtonOnly
-                      ? toggleDraft("storeId", store.id)
-                      : toggleParam("storeId", store.id, initialStoreId)
-                  }
-                />
-              ))}
-            </FilterRow>
-          ) : null}
         </div>
       ) : null}
 
@@ -476,7 +496,7 @@ function FilterRow({
       <p className="mb-1.5 px-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400">
         {label}
       </p>
-      <div className="-mx-0.5 flex gap-1.5 overflow-x-auto px-0.5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-0.5 flex gap-1.5 overflow-x-auto px-0.5 pb-0.5 scrollbar-none">
         {children}
       </div>
     </div>

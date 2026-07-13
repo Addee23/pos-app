@@ -17,12 +17,26 @@ type ToastItem = {
   message: string;
 };
 
+type ConfirmToastItem = {
+  id: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  onConfirm: () => void;
+};
+
+type ConfirmOptions = {
+  confirmLabel?: string;
+  cancelLabel?: string;
+};
+
 type ToastContextValue = {
   toast: (type: ToastType, message: string) => void;
   success: (message: string) => void;
   error: (message: string) => void;
   warning: (message: string) => void;
   info: (message: string) => void;
+  confirm: (message: string, onConfirm: () => void, options?: ConfirmOptions) => void;
 };
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -56,11 +70,65 @@ const TOAST_STYLES: Record<
   },
 };
 
+function ConfirmToastCard({
+  item,
+  onConfirm,
+  onDismiss,
+}: {
+  item: ConfirmToastItem;
+  onConfirm: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div
+      role="alertdialog"
+      className="toast-enter pointer-events-auto flex flex-col gap-3 rounded-2xl border border-red-200/80 bg-red-50 px-3.5 py-3 shadow-lg shadow-red-100/60 text-red-900"
+    >
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-white/80 text-xs font-bold">!</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-bold uppercase tracking-wide opacity-70">Bekräfta</p>
+          <p className="mt-0.5 text-sm font-semibold leading-5">{item.message}</p>
+        </div>
+        <button
+          type="button"
+          aria-label="Stäng"
+          onClick={onDismiss}
+          className="-mr-1 shrink-0 cursor-pointer rounded-lg px-2 py-1 text-sm font-bold opacity-50 transition hover:opacity-100"
+        >
+          ×
+        </button>
+      </div>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="flex-1 cursor-pointer rounded-xl border border-red-200 bg-white py-2 text-xs font-bold text-red-700 transition hover:bg-red-50"
+        >
+          {item.cancelLabel}
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="flex-1 cursor-pointer rounded-xl bg-red-600 py-2 text-xs font-bold text-white transition hover:bg-red-700"
+        >
+          {item.confirmLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [confirms, setConfirms] = useState<ConfirmToastItem[]>([]);
 
   const dismiss = useCallback((id: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== id));
+  }, []);
+
+  const dismissConfirm = useCallback((id: string) => {
+    setConfirms((current) => current.filter((c) => c.id !== id));
   }, []);
 
   const pushToast = useCallback(
@@ -74,6 +142,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [dismiss],
   );
 
+  const pushConfirm = useCallback(
+    (message: string, onConfirm: () => void, options?: ConfirmOptions) => {
+      const id = crypto.randomUUID();
+      const confirmLabel = options?.confirmLabel ?? "Ja, bekräfta";
+      const cancelLabel = options?.cancelLabel ?? "Nej, avbryt";
+      setConfirms((current) => [...current.slice(-1), { id, message, confirmLabel, cancelLabel, onConfirm }]);
+      window.setTimeout(() => dismissConfirm(id), 10000);
+    },
+    [dismissConfirm],
+  );
+
   const value = useMemo<ToastContextValue>(
     () => ({
       toast: pushToast,
@@ -81,8 +160,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       error: (message) => pushToast("error", message),
       warning: (message) => pushToast("warning", message),
       info: (message) => pushToast("info", message),
+      confirm: pushConfirm,
     }),
-    [pushToast],
+    [pushToast, pushConfirm],
   );
 
   return (
@@ -93,6 +173,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         aria-relevant="additions"
         className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[120] flex flex-col gap-2 px-4 lg:inset-x-auto lg:bottom-6 lg:right-6 lg:max-w-sm lg:items-end lg:px-0"
       >
+        {confirms.map((c) => (
+          <ConfirmToastCard
+            key={c.id}
+            item={c}
+            onConfirm={() => { c.onConfirm(); dismissConfirm(c.id); }}
+            onDismiss={() => dismissConfirm(c.id)}
+          />
+        ))}
         {toasts.map((toast) => (
           <ToastCard
             key={toast.id}

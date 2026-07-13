@@ -23,11 +23,15 @@ export async function GET() {
       name: true,
       role: true,
       createdAt: true,
+      stores: { select: { storeId: true, store: { select: { id: true, name: true } } } },
     },
     orderBy: [{ role: "asc" }, { name: "asc" }],
   });
 
-  return NextResponse.json(users);
+  return NextResponse.json(users.map((u) => ({
+    ...u,
+    stores: u.stores.map((s) => s.store),
+  })));
 }
 
 export async function POST(request: Request) {
@@ -83,6 +87,9 @@ export async function POST(request: Request) {
         name: parsed.data.name,
         passwordHash,
         role: parsed.data.role,
+        stores: parsed.data.storeIds.length > 0
+          ? { create: parsed.data.storeIds.map((storeId) => ({ storeId })) }
+          : undefined,
       },
       select: {
         id: true,
@@ -90,10 +97,14 @@ export async function POST(request: Request) {
         name: true,
         role: true,
         createdAt: true,
+        stores: { select: { store: { select: { id: true, name: true } } } },
       },
     });
 
-    return NextResponse.json(user, { status: 201 });
+    return NextResponse.json(
+      { ...user, stores: user.stores.map((s) => s.store) },
+      { status: 201 },
+    );
   } catch (error) {
     console.error(error);
     return NextResponse.json(

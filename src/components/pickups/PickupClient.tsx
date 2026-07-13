@@ -222,14 +222,14 @@ export function PickupClient({
   }
 
   async function cancelPickup(pickupId: string) {
-    const shouldCancel = window.confirm(
+    toast.confirm(
       "Avbryt den här ordern? Den kommer inte längre kunna markeras som hämtad.",
+      () => void doCancel(pickupId),
+      { confirmLabel: "Ja, avbryt order", cancelLabel: "Nej, behåll" },
     );
+  }
 
-    if (!shouldCancel) {
-      return;
-    }
-
+  async function doCancel(pickupId: string) {
     setActivePickupId(pickupId);
 
     try {
@@ -282,7 +282,7 @@ export function PickupClient({
           Upphämtningar
         </h2>
 
-        {currentRole === "PERSONAL" && stores.length > 1 && (
+        {stores.length > 1 && (
           <div className="mt-3 flex flex-col gap-1.5">
             <p className="text-xs font-semibold text-zinc-500">Visa butik(er)</p>
             <div className="flex flex-col gap-1 rounded-lg border border-zinc-200 p-2.5">
@@ -315,6 +315,7 @@ export function PickupClient({
         <PickupDashboardTabs
           activeTab={activeTab}
           counts={dashboard.counts}
+          readyForPickupItems={dashboard.readyForPickup}
           fetchedAt={dashboard.fetchedAt}
           isRefreshing={isRefreshing}
           refreshFlash={refreshFlash}
@@ -400,9 +401,12 @@ export function PickupClient({
   );
 }
 
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
 function PickupDashboardTabs({
   activeTab,
   counts,
+  readyForPickupItems,
   fetchedAt,
   isRefreshing,
   refreshFlash,
@@ -411,6 +415,7 @@ function PickupDashboardTabs({
 }: {
   activeTab: PickupDashboardTab;
   counts: PickupDashboardPayload["counts"];
+  readyForPickupItems: PickupDashboardPayload["readyForPickup"];
   fetchedAt: string;
   isRefreshing: boolean;
   refreshFlash: boolean;
@@ -419,13 +424,19 @@ function PickupDashboardTabs({
 }) {
   const tabs: PickupDashboardTab[] = ["needsHandling", "readyForPickup"];
 
+  const hasOverdueReady = readyForPickupItems.some((p) => {
+    const since = p.packedAt ?? p.createdAt;
+    return Date.now() - new Date(since).getTime() > ONE_WEEK_MS;
+  });
+
   return (
     <div className="mt-4 flex flex-col gap-2">
       <div className="grid grid-cols-2 gap-2">
         {tabs.map((tab) => {
           const count = counts[tab];
           const isActive = activeTab === tab;
-          const shouldBlink = count > 0;
+          const shouldBlink =
+            tab === "needsHandling" ? count > 0 : hasOverdueReady;
 
           return (
             <button
@@ -576,13 +587,14 @@ function PickupPopup({
             </h3>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="cursor-pointer rounded-xl border border-[#dfd4c6] bg-white px-3 py-2 text-xs font-bold text-[#43342c] transition hover:border-orange-300 hover:text-orange-700 print:hidden"
+            <a
+              href={`/upphamtning/print?id=${pickups.map((p) => p.id).join(",")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="cursor-pointer rounded-xl border border-[#dfd4c6] bg-white px-3 py-2 text-xs font-bold text-[#43342c] transition hover:border-orange-300 hover:text-orange-700"
             >
               Skriv ut plocklista
-            </button>
+            </a>
             <button
               type="button"
               onClick={onClose}
@@ -608,62 +620,6 @@ function PickupPopup({
         </div>
       </section>
 
-      {/* Ren utskriftslayout — visas bara vid print */}
-      <div id="plocklista-print-area" className="hidden print:block">
-        {pickups.map((pickup) => (
-          <div key={pickup.id} className="mb-8">
-            <div className="mb-4 border-b-2 border-black pb-2">
-              <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Plocklista</p>
-              <h1 className="text-2xl font-bold">{pickup.customerName}</h1>
-              <p className="text-base font-semibold">{pickup.pickupCode}</p>
-              <p className="text-sm text-zinc-500">{formatDate(pickup.createdAt)}</p>
-            </div>
-
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-zinc-300">
-                  <th className="w-8 py-2 text-left">
-                    <span style={{ display: "inline-block", width: 18, height: 18, borderRadius: "50%", border: "2px solid #aaa", verticalAlign: "middle" }} />
-                  </th>
-                  <th className="py-2 text-left font-bold">Produkt</th>
-                  <th className="py-2 text-center font-bold">Antal</th>
-                  <th className="py-2 text-left font-bold">Hylla</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pickup.items.map((item) => (
-                  <tr key={item.id} className="border-b border-zinc-200">
-                    <td className="py-2">
-                      <span style={{ display: "inline-block", width: 18, height: 18, borderRadius: "50%", border: "2px solid #aaa", verticalAlign: "middle" }} />
-                    </td>
-                    <td className="py-2 font-medium">{itemLabel(item)}</td>
-                    <td className="py-2 text-center font-bold">{item.quantity}</td>
-                    <td className="py-2">{item.stockLocation ?? "–"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {pickup.notes ? (
-              <div className="mt-4 border border-zinc-300 p-3">
-                <p className="text-xs font-bold uppercase text-zinc-500">Notering</p>
-                <p className="mt-1 text-sm">{pickup.notes}</p>
-              </div>
-            ) : null}
-
-            <div className="mt-6 flex gap-8 text-sm">
-              <div>
-                <p className="text-xs font-bold uppercase text-zinc-500">Packad av</p>
-                <p className="mt-4 border-b border-zinc-400 w-40">&nbsp;</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase text-zinc-500">Kontroll</p>
-                <p className="mt-4 border-b border-zinc-400 w-28">&nbsp;</p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -761,17 +717,6 @@ function PickupCard({
         )}
       </div>
 
-      {canCancel ? (
-        <button
-          type="button"
-          disabled={isSaving}
-          onClick={() => onCancel(pickup.id)}
-          className="mt-2 min-h-10 w-full cursor-pointer rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Avbryt order
-        </button>
-      ) : null}
-
       <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-zinc-500 sm:grid-cols-2">
         <MetaBox label="Kundmail" value={pickup.customerEmail ?? "Saknas"} />
         <MetaBox label="Mailstatus" value={mailStatusLabel(pickup)} />
@@ -850,7 +795,7 @@ function PickupInfoCard({
               key={item.id}
               item={item}
               checked={checkedItems.has(item.id)}
-              onToggle={canPack ? () => toggleItem(item.id) : undefined}
+              onToggle={() => toggleItem(item.id)}
             />
           ))
         ) : (
@@ -896,16 +841,6 @@ function PickupInfoCard({
         </div>
       ) : null}
 
-      {canCancel ? (
-        <button
-          type="button"
-          disabled={isSaving}
-          onClick={() => onCancel(pickup.id)}
-          className="mt-2 min-h-12 w-full cursor-pointer rounded-xl border border-red-200 bg-white px-4 text-sm font-bold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Avbryt order
-        </button>
-      ) : null}
     </article>
   );
 }

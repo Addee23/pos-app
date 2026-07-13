@@ -5,11 +5,13 @@ export const userCreateSchema = z.object({
   name: z.string().trim().min(2, "Namnet måste vara minst 2 tecken"),
   password: z.string().min(6, "Lösenordet måste vara minst 6 tecken"),
   role: z.enum(["ADMIN", "PERSONAL"]),
+  storeIds: z.array(z.string()).optional().default([]),
 });
 
 export const userUpdateSchema = z.object({
   name: z.string().trim().min(2, "Namnet måste vara minst 2 tecken"),
   role: z.enum(["ADMIN", "PERSONAL"]),
+  storeIds: z.array(z.string()).optional(),
 });
 
 export type UserCreateInput = z.infer<typeof userCreateSchema>;

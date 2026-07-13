@@ -1,6 +1,5 @@
 "use client";
 
-import { TaxonomyFields } from "@/components/products/TaxonomyFields";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
@@ -10,12 +9,10 @@ export type EditableProduct = {
   name: string;
   slug: string;
   price: number;
+  sku: string | null;
   ean: string | null;
   stockQuantity: number;
   stockLocation: string | null;
-  category: string | null;
-  brand: string | null;
-  country: string | null;
   variants: EditableProductVariant[];
 };
 
@@ -24,6 +21,7 @@ type EditableProductVariant = {
   wooVariantId: number;
   name: string;
   price: number;
+  sku: string | null;
   ean: string | null;
   stockQuantity: number;
   stockLocation: string | null;
@@ -43,12 +41,10 @@ export function ProductEditForm({ product }: ProductEditFormProps) {
 
     const body = {
       price: formData.get("price"),
+      sku: formData.get("sku"),
       ean: formData.get("ean"),
       stockQuantity: formData.get("stockQuantity"),
       stockLocation: formData.get("stockLocation"),
-      category: formData.get("category"),
-      brand: formData.get("brand"),
-      country: formData.get("country"),
     };
 
     try {
@@ -112,11 +108,18 @@ export function ProductEditForm({ product }: ProductEditFormProps) {
             hint="Pris i kronor exkl. eventuell moms."
           />
           <Field
+            label="SKU"
+            name="sku"
+            defaultValue={product.sku ?? ""}
+            placeholder="ART-1234"
+            hint="Internt artikelnummer från WooCommerce."
+          />
+          <Field
             label="EAN"
             name="ean"
             defaultValue={product.ean ?? ""}
             placeholder="7350012345678"
-            hint="Streckkod, SKU eller EAN för skanning i kassan."
+            hint="Streckkod för skanning i kassan."
           />
           <Field
             label="Lagersaldo"
@@ -134,16 +137,6 @@ export function ProductEditForm({ product }: ProductEditFormProps) {
             placeholder="Hylla A3"
             hint="Var produkten står i butiken."
           />
-        </div>
-
-        <div className="mt-4 border-t border-zinc-100 pt-4">
-          <div className="mt-3">
-            <TaxonomyFields
-              category={product.category}
-              brand={product.brand}
-              country={product.country}
-            />
-          </div>
         </div>
 
         <button
@@ -192,6 +185,7 @@ function VariantForm({
 
     const body = {
       price: formData.get("price"),
+      sku: formData.get("sku"),
       ean: formData.get("ean"),
       stockQuantity: formData.get("stockQuantity"),
       stockLocation: formData.get("stockLocation"),
@@ -250,11 +244,18 @@ function VariantForm({
         hint="Pris i kronor för denna variant."
       />
       <Field
+        label="SKU"
+        name="sku"
+        defaultValue={variant.sku ?? ""}
+        placeholder="ART-1234"
+        hint="Internt artikelnummer för varianten."
+      />
+      <Field
         label="EAN"
         name="ean"
         defaultValue={variant.ean ?? ""}
         placeholder="7350012345678"
-        hint="Streckkod eller SKU för varianten."
+        hint="Streckkod för skanning i kassan."
       />
       <Field
         label="Lager"

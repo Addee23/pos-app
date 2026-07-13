@@ -48,23 +48,11 @@ export async function importWooProductsForStore(
 ): Promise<ImportProductsResult> {
   const updateOnly = options.updateOnly === true;
 
-  const storeConfig = await prisma.store.findUnique({
-    where: { id: store.id },
-    select: { metaLabels: true },
-  });
-  const allowedMetaKeys =
-    storeConfig?.metaLabels &&
-    typeof storeConfig.metaLabels === "object" &&
-    !Array.isArray(storeConfig.metaLabels)
-      ? Object.keys(storeConfig.metaLabels as Record<string, string>)
-      : undefined;
-
   const products = await normalizeWooProducts({
     products: rawProducts,
     loadVariations: canLoadWooVariations(store)
       ? (productId) => loadWooVariations(store, productId)
       : undefined,
-    allowedMetaKeys,
   });
 
   const result: ImportProductsResult = {
@@ -146,6 +134,7 @@ function productWritePayload(product: ImportedWooProduct) {
     permalink: product.permalink,
     productType: product.productType,
     price: product.price,
+    sku: product.sku,
     ean: product.ean,
     imageUrl: product.imageUrl,
     metaDescription: product.metaDescription,
@@ -162,6 +151,7 @@ function variantWritePayload(variant: ImportedWooVariant) {
   return {
     name: variant.name,
     price: variant.price,
+    sku: variant.sku,
     ean: variant.ean,
     imageUrl: variant.imageUrl,
     metaDescription: variant.metaDescription,
@@ -241,6 +231,7 @@ function hasProductChanges(
     existing.permalink !== incoming.permalink ||
     existing.productType !== incoming.productType ||
     comparePrice(existing.price, incoming.price) !== 0 ||
+    existing.sku !== incoming.sku ||
     existing.ean !== incoming.ean ||
     existing.imageUrl !== incoming.imageUrl ||
     existing.metaDescription !== incoming.metaDescription ||
@@ -260,6 +251,7 @@ function hasVariantChanges(
   return (
     existing.name !== incoming.name ||
     comparePrice(existing.price, incoming.price) !== 0 ||
+    existing.sku !== incoming.sku ||
     existing.ean !== incoming.ean ||
     existing.imageUrl !== incoming.imageUrl ||
     existing.metaDescription !== incoming.metaDescription ||

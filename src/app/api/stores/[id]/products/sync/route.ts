@@ -66,8 +66,7 @@ export async function POST(_request: Request, context: RouteContext) {
 
         controller.enqueue(send({ type: "done", result, fetchedFromWoo: rawProducts.length }));
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Kunde inte uppdatera produkter från WooCommerce";
+        const message = toSwedishError(error);
         controller.enqueue(send({ type: "error", message }));
       } finally {
         controller.close();
@@ -78,4 +77,14 @@ export async function POST(_request: Request, context: RouteContext) {
   return new Response(stream, {
     headers: { "Content-Type": "application/x-ndjson" },
   });
+}
+
+function toSwedishError(error: unknown): string {
+  if (error instanceof Error) {
+    if (error.name === "TimeoutError" || error.name === "AbortError") {
+      return "WooCommerce svarade inte inom 30 sekunder. Kontrollera att butikens URL och API-nycklar är korrekta under Inställningar.";
+    }
+    return error.message;
+  }
+  return "Kunde inte uppdatera produkter från WooCommerce";
 }

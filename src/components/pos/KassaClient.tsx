@@ -6,6 +6,7 @@ import {
   resolveReceiptLogoUrl,
 } from "@/components/pos/ReceiptStoreLogo";
 import { useEffect, useState, type CSSProperties } from "react";
+import { clearCart, loadRawCart } from "@/lib/cart-storage";
 
 export type PosStore = {
   id: string;
@@ -80,43 +81,37 @@ export function KassaClient({ store, isAdmin = false, allStores }: KassaClientPr
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchItem[]>([]);
-  const [resultPopupOpen, setResultPopupOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [saving, setSaving] = useState(false);
-  const [browseProducts, setBrowseProducts] = useState<GroupedSearchProduct[]>([]);
-  const [browsePage, setBrowsePage] = useState(1);
-  const [browseHasMore, setBrowseHasMore] = useState(false);
-  const [browseLoading, setBrowseLoading] = useState(false);
-  const [browseTotal, setBrowseTotal] = useState(0);
 
   const total = cart.reduce(
     (sum, item) => sum + item.unitPrice * item.quantity,
     0,
   );
 
-  async function loadBrowse(page: number, reset: boolean) {
-    setBrowseLoading(true);
-    try {
-      const res = await fetch(
-        `/api/pos/products?storeId=${encodeURIComponent(store.id)}&page=${page}`,
-      );
-      if (!res.ok) return;
-      const data = (await res.json()) as { items: SearchItem[]; hasMore: boolean; total: number };
-      const groups = groupSearchResults(data.items);
-      setBrowseProducts((prev) => (reset ? groups : [...prev, ...groups]));
-      setBrowseHasMore(data.hasMore);
-      setBrowseTotal(data.total);
-      setBrowsePage(page);
-    } catch {
-      /* ignore */
-    } finally {
-      setBrowseLoading(false);
-    }
-  }
-
   useEffect(() => {
-    void loadBrowse(1, true);
+    const saved = loadRawCart();
+    if (saved && saved.items.length > 0) {
+      if (saved.storeId !== store.id) {
+        window.location.href = `/kassa?storeId=${encodeURIComponent(saved.storeId)}`;
+        return;
+      }
+      setCart(saved.items.map((item) => ({
+        cartKey: item.cartKey,
+        productId: item.productId,
+        variantId: item.variantId,
+        name: item.name,
+        variantName: item.variantName,
+        ean: item.ean,
+        imageUrl: item.imageUrl,
+        description: item.description,
+        stockLocation: item.stockLocation,
+        unitPrice: item.price,
+        quantity: item.quantity,
+        maxQuantity: item.maxQuantity,
+      })));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.id]);
 
@@ -124,7 +119,6 @@ export function KassaClient({ store, isAdmin = false, allStores }: KassaClientPr
     const nextQuery = String(formData.get("q") ?? "").trim();
     setQuery(nextQuery);
     setSearchResults([]);
-    setResultPopupOpen(false);
 
     if (!nextQuery) {
       toast.error("Skriv eller scanna en produktkod.");
@@ -148,17 +142,19 @@ export function KassaClient({ store, isAdmin = false, allStores }: KassaClientPr
       if (data.exactMatch) {
         addSearchItem(data.exactMatch);
         setQuery("");
+        setSearchResults([]);
         toast.success(`${displayName(data.exactMatch)} lades till i varukorgen.`);
         return;
       }
 
-      if (data.results.length === 0) {
+      const inStock = data.results.filter((item) => item.stockQuantity > 0);
+
+      if (inStock.length === 0) {
         toast.error("Ingen produkt hittades.");
         return;
       }
 
-      setSearchResults(data.results);
-      setResultPopupOpen(true);
+      setSearchResults(inStock);
     } catch (error) {
       console.error(error);
       toast.error("Något gick fel vid sökningen. Försök igen.");
@@ -208,22 +204,17 @@ export function KassaClient({ store, isAdmin = false, allStores }: KassaClientPr
   }
 
   function cancelCart() {
-    if (cart.length === 0) {
-      return;
-    }
-
-    const shouldCancel = window.confirm(
+    if (cart.length === 0) return;
+    toast.confirm(
       "Avbryt köpet? Alla varor tas bort från varukorgen.",
+      () => {
+        setCart([]);
+        clearCart();
+        setSearchResults([]);
+        toast.success("Köpet avbröts och varukorgen tömdes.");
+      },
+      { confirmLabel: "Ja, töm varukorgen", cancelLabel: "Nej, behåll" },
     );
-
-    if (!shouldCancel) {
-      return;
-    }
-
-    setCart([]);
-    setSearchResults([]);
-    setResultPopupOpen(false);
-    toast.success("Köpet avbröts och varukorgen tömdes.");
   }
 
   function changeQuantity(cartKey: string, change: number) {
@@ -297,11 +288,10 @@ export function KassaClient({ store, isAdmin = false, allStores }: KassaClientPr
         items: cart,
       });
       setCart([]);
+      clearCart();
       setQuery("");
       setSearchResults([]);
-      setResultPopupOpen(false);
       toast.success("Köpet slutfördes och lagret uppdaterades.");
-      void loadBrowse(1, true);
     } catch (error) {
       console.error(error);
       toast.error("Något gick fel vid anropet. Försök igen.");
@@ -358,145 +348,49 @@ export function KassaClient({ store, isAdmin = false, allStores }: KassaClientPr
           <button
             type="submit"
             disabled={searching}
-            className="min-h-11 cursor-pointer rounded-2xl bg-accent px-4 text-sm font-bold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-11 cursor-pointer rounded-2xl bg-accent px-4 text-sm font-bold text-accent-foreground shadow-sm shadow-blue-200 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60 lg:hidden"
           >
             {searching ? "Söker..." : "Sök produkt"}
           </button>
         </form>
 
-        <div className="flex flex-col gap-3">
-          <p className="text-xs font-semibold text-zinc-400">
-            Produkter i lager{browseTotal > 0 ? ` (${browseTotal})` : ""}
-          </p>
-
-          {browseLoading && browseProducts.length === 0 ? (
-            <p className="py-6 text-center text-sm text-zinc-400">Laddar produkter...</p>
-          ) : browseProducts.length === 0 ? (
-            <p className="py-6 text-center text-sm text-zinc-400">Inga produkter i lager.</p>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-3">
-                {browseProducts.map((group) => (
-                  <SearchProductCard
-                    key={group.productId}
-                    group={group}
-                    onAdd={(item) => {
-                      addSearchItem(item);
-                      toast.success(`${displayName(item)} lades till i varukorgen.`);
-                    }}
-                  />
-                ))}
-              </div>
-              {browseHasMore ? (
-                <button
-                  type="button"
-                  onClick={() => void loadBrowse(browsePage + 1, false)}
-                  disabled={browseLoading}
-                  className="min-h-11 w-full cursor-pointer rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-bold text-zinc-700 shadow-sm transition hover:border-orange-300 hover:text-orange-700 disabled:opacity-60"
-                >
-                  {browseLoading ? "Laddar..." : "Ladda mer"}
-                </button>
-              ) : null}
-            </>
-          )}
-        </div>
+        {searching ? (
+          <p className="py-6 text-center text-sm text-zinc-400">Söker...</p>
+        ) : searchResults.length > 0 ? (
+          <div className="flex flex-wrap gap-3">
+            {groupSearchResults(searchResults).map((group) => (
+              <SearchProductCard
+                key={group.productId}
+                group={group}
+                onAdd={(item) => {
+                  addSearchItem(item);
+                  setSearchResults([]);
+                  setQuery("");
+                  toast.success(`${displayName(item)} lades till i varukorgen.`);
+                }}
+              />
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <div className="flex flex-col gap-4 lg:sticky lg:top-24">
-      <CartPanel
-        cart={cart}
-        total={total}
-        saving={saving}
-        isAdmin={isAdmin}
-        onChangeQuantity={changeQuantity}
-        onSetQuantity={setExactQuantity}
-        onCancelCart={cancelCart}
-        onCompleteSale={completeSale}
-      />
-
-      {receipt ? <ReceiptPanel receipt={receipt} store={store} /> : null}
-      </div>
-
-      {resultPopupOpen ? (
-        <SearchResultPopup
-          results={searchResults}
-          onClose={() => setResultPopupOpen(false)}
-          onAdd={(item) => {
-            addSearchItem(item);
-            setResultPopupOpen(false);
-            setQuery("");
-            toast.success(`${displayName(item)} lades till i varukorgen.`);
-          }}
+        <CartPanel
+          cart={cart}
+          total={total}
+          saving={saving}
+          isAdmin={isAdmin}
+          onChangeQuantity={changeQuantity}
+          onSetQuantity={setExactQuantity}
+          onCancelCart={cancelCart}
+          onCompleteSale={completeSale}
         />
-      ) : null}
+        {receipt ? <ReceiptPanel receipt={receipt} store={store} /> : null}
+      </div>
     </div>
   );
 }
 
-function SearchResultPopup({
-  results,
-  onClose,
-  onAdd,
-}: {
-  results: SearchItem[];
-  onClose: () => void;
-  onAdd: (item: SearchItem) => void;
-}) {
-  const groupedResults = groupSearchResults(results);
-  const singleGroup = groupedResults.length === 1 ? groupedResults[0] : null;
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  function handleSectionClick(e: React.MouseEvent) {
-    e.stopPropagation();
-    if (singleGroup) {
-      const item = singleGroup.options[0];
-      if (item.stockQuantity > 0) onAdd(item);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-90 flex items-end justify-center bg-zinc-950/35 px-3 pb-3 pt-10 lg:items-center lg:p-6" onClick={onClose}>
-      <section
-        className={`max-h-[88vh] w-full max-w-107.5 overflow-y-auto rounded-4xl bg-[#f3eee5] p-4 shadow-2xl lg:max-w-xl ${singleGroup ? "cursor-pointer" : ""}`}
-        onClick={handleSectionClick}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-orange-600">
-              Sökresultat
-            </p>
-            <h3 className="mt-1 text-lg font-bold text-[#43342c]">
-              Välj produkt
-            </h3>
-          </div>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onClose(); }}
-            className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-white/80 text-sm font-bold text-zinc-500"
-            aria-label="Stäng sökresultat"
-          >
-            x
-          </button>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-3">
-          {groupedResults.map((group) => (
-            <SearchProductCard
-              key={group.productId}
-              group={group}
-              onAdd={onAdd}
-            />
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-}
 
 type GroupedSearchProduct = {
   productId: string;

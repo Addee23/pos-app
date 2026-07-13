@@ -11,8 +11,15 @@ const optionalLabelField = z
   .optional()
   .transform((v) => (v === "" ? null : v ?? null));
 
+const optionalSkuField = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v === "" ? null : v ?? null));
+
 export const productUpdateSchema = z.object({
   price: z.coerce.number().min(0, "Pris kan inte vara negativt"),
+  sku: optionalSkuField,
   ean: z
     .string()
     .trim()
@@ -24,13 +31,11 @@ export const productUpdateSchema = z.object({
     .trim()
     .optional()
     .transform((v) => (v === "" ? null : v ?? null)),
-  category: optionalLabelField.transform(normalizeCategory),
-  brand: optionalLabelField.transform(normalizeBrand),
-  country: optionalLabelField.transform(normalizeCountry),
 });
 
 export const variantUpdateSchema = z.object({
   price: z.coerce.number().min(0, "Pris kan inte vara negativt"),
+  sku: optionalSkuField,
   ean: z
     .string()
     .trim()
